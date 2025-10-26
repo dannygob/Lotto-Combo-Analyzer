@@ -1,0 +1,20 @@
+lotto-combo-analyzer/
+├── data/
+│   └── lotto_history.csv           # Dataset original o de ejemplo
+├── notebooks/
+│   └── Lotto_Combo_Analyzer.ipynb  # Notebook principal (versión 1.0)
+├── src/
+│   ├── __init__.py                 # Inicializador del módulo
+│   ├── preprocessing.py            # Funciones de carga y limpieza
+│   ├── analysis.py                 # Estadísticas y visualizaciones
+│   ├── clustering.py               # KMeans y visualización de clústeres
+│   ├── modeling.py                 # LSTM + Optuna + métricas
+│   ├── comparison.py               # Random Forest / XGBoost
+│   ├── evaluation.py               # Métricas por grupo completo
+│   ├── simulation.py               # Simulaciones múltiples
+│   └── association.py              # Apriori y reglas de asociación
+├── results/
+│   └── predictions.csv             # Combinaciones generadas
+├── README.md                       # Descripción del proyecto
+├── requirements.txt                # Librerías necesarias
+└── .gitignore                      # Archivos a excluir del control de versiones

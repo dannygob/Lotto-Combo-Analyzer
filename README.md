@@ -107,3 +107,60 @@ Interactive Draw Number Entry
 Unique Combination Generation
 
 Check Against History
+
+## 📁 Folder Structure
+
+lotto-combo-analyzer/
+├── data/
+│ └── lotto_history.csv # Original or example dataset
+├── notebooks/
+│ └── Lotto_Combo_Analyzer.ipynb # Main notebook (version 1.0)
+├── src/
+│ ├── __init__.py
+│ ├── preprocessing.py # Loading and cleaning functions
+│ ├── analysis.py # Statistics and visualizations
+│ ├── clustering.py # KMeans and cluster visualization
+│ ├── modeling.py # LSTM + Optuna + metrics
+│ ├── comparison.py # Random Forest / XGBoost
+│ ├── evaluation.py # Metrics for the entire group
+│ ├── simulation.py # Multiple simulations
+│ └── association.py # Apriori and association rules
+├── results/
+│ └── predictions.csv # Generated combinations
+├── README.md # Project description
+├── requirements.txt # Required libraries
+└── .gitignore # Files to exclude from version control
+
+
+
+## 🚀 Getting Started
+
+1. Clone the repository:
+   git clone https://github.com/your-username/lotto-combo-analyzer.git
+   cd lotto-combo-analyzer
+
+2. Install dependencies:
+   pip install -r requirements.txt
+
+3. Run the main notebook or script:
+   jupyter notebook notebooks/Lotto_Combo_Analyzer.ipynb
+
+## 📊 Dataset
+Place your historical lottery dataset in the `data/` folder. The file should be named `lotto_history.csv` and contain columns like `numero 1`, `numero 2`, ..., `numero 6`.
+
+## 🧠 Models Used
+
+- LSTM (Long Short-Term Memory)
+- Random Forest Classifier
+- XGBoost Classifier
+
+## 📈 Metrics
+
+- MAE, MSE, RMSE, R²
+- Log Loss
+- Top-k Accuracy
+- Group-level prediction accuracy
+
+## 📄 License
+
+opensource

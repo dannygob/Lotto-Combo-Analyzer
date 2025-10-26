@@ -1,0 +1,9 @@
+# 📌 CHANGELOG — Lotto Combo Analyzer
+
+All notable changes to this project will be documented in this file.
+
+## [v1.0] - Initial release
+- Project structure defined and modularized
+- Added preprocessing, analysis, clustering, modeling, comparison, evaluation, simulation, and association modules
+- Created main notebook with integrated workflow
+- Added README, requirements, and .gitignore files

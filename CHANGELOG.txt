@@ -2,8 +2,72 @@
 
 All notable changes to this project will be documented in this file.
 
-## [v1.0] - Initial release
-- Project structure defined and modularized
-- Added preprocessing, analysis, clustering, modeling, comparison, evaluation, simulation, and association modules
-- Created main notebook with integrated workflow
-- Added README, requirements, and .gitignore files
+## [v1.0] — Initial release
+
+🗓️ Date: 2025-10-26
+
+🎯 Overview:
+This version establishes the foundational structure and functionality of the Lotto Combo Analyzer project. It includes full data analysis, modeling, prediction, simulation, and association rule mining for lottery number combinations.
+
+🧩 Modules and Features:
+
+1. **Data Preprocessing**
+   - Load and clean historical lottery data from CSV
+   - Extract and sort 6-number combinations
+   - Prepare unique combination history set
+
+2. **Statistical Analysis**
+   - Frequency analysis of drawn numbers
+   - Sum distribution and descriptive statistics
+   - Differential analysis between draws
+   - Change classification (up/down/same)
+
+3. **Clustering**
+   - KMeans clustering of combinations
+   - Elbow method for optimal cluster count
+   - Cluster distribution visualization
+
+4. **Sequence Preparation**
+   - Transform combinations into sequences
+   - Filter out-of-range values
+   - One-hot encode labels for classification
+
+5. **LSTM Modeling**
+   - Build and train LSTM model
+   - Hyperparameter tuning with Optuna
+   - Cross-validation with K-Fold
+   - Metrics: MAE, MSE, RMSE, R², Log Loss
+
+6. **Model Comparison**
+   - Train Random Forest and XGBoost classifiers
+   - Compare performance with LSTM
+   - Evaluate accuracy and log loss
+
+7. **Group-Level Evaluation**
+   - Compare predicted vs. actual 6-number sets
+   - Calculate exact and partial match rates
+   - Report accuracy by group
+
+8. **Multiple Simulations**
+   - Generate multiple unique combinations
+   - Filter out historical duplicates
+   - Display top simulated predictions
+
+9. **Association Rules (Apriori)**
+   - Convert draws into transactions
+   - Apply Apriori to find frequent itemsets
+   - Generate rules with support, confidence, and lift
+   - Visualize lift distribution
+
+10. **Personalized Forecast**
+    - Allow user to input a draw index
+    - Generate a unique prediction based on that seed
+    - Ensure prediction is not repeated
+
+🧠 Strengths:
+- Modular and extensible architecture
+- Visual insights at every stage
+- Real AI modeling with LSTM and Optuna
+- Clean separation of analysis, modeling, and evaluation
+- Ready for version control and collaboration
+

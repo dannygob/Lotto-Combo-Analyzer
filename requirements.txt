@@ -1,9 +1,27 @@
-pandas
-numpy
-matplotlib
-seaborn
-scikit-learn
-tensorflow
-optuna
-mlxtend
-xgboost
+# Core libraries
+numpy               # Used for numerical operations and array handling (modeling.py, preprocessing.py)
+pandas              # Used for data manipulation and CSV loading (preprocessing.py, analysis.py)
+scikit-learn        # Used for clustering, Random Forest, and metrics (clustering.py, comparison.py, evaluation.py)
+matplotlib          # Used for visualizations (analysis.py, clustering.py)
+seaborn             # Used for enhanced statistical plots (analysis.py)
+
+# Deep learning
+tensorflow          # Required for building and training the LSTM model (modeling.py)
+keras               # Used for LSTM layers and to_categorical encoding (modeling.py, preprocessing.py)
+
+# Optimization
+optuna              # Used for hyperparameter tuning of the LSTM model (modeling.py)
+
+# Association rules
+mlxtend             # Used for Apriori algorithm and rule generation (association.py)
+
+# Logging and utilities
+loguru              # Used for structured logging (utils.py, modeling.py)
+tqdm                # Used for progress bars during training and simulations (simulation.py)
+
+# Notebook interface
+jupyter             # Required to run the main notebook (Lotto_Combo_Analyzer.ipynb)
+
+# Optional (if used in utils or notebook)
+python-dotenv       # For environment variable handling (if .env is used)
+

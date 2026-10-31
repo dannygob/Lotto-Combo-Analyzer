@@ -37,7 +37,6 @@ class DomainModel(BaseModel):
 class Lottery(DomainModel):
     lottery_id: Slug
     name: Annotated[str, Field(min_length=1, max_length=200)]
-    jurisdiction: Annotated[str, Field(min_length=1, max_length=100)]
 
 
 class NumberPool(DomainModel):

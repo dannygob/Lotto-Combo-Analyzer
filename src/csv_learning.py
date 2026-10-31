@@ -64,6 +64,58 @@ def _read_csv(raw_csv: bytes, filename: str) -> tuple[pd.DataFrame, int]:
     return frame, blank_rows_skipped
 
 
+def inspect_csv_draw_format(raw_csv: bytes, filename: str) -> dict[str, object]:
+    """Suggest a single-pool draw format from CSV columns and observed values."""
+    safe_filename = _dataset_name(filename)
+    frame, blank_rows_skipped = _read_csv(raw_csv, safe_filename)
+    number_columns = infer_number_columns(frame.columns)
+    suggestion: dict[str, int] | None = None
+    warning = "Suggestions describe this file only; confirm the lottery's official rules."
+
+    if number_columns:
+        values = frame[number_columns].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=np.float64)
+        if np.all(np.isfinite(values)) and np.all(values == np.floor(values)):
+            suggestion = {
+                "minimum": int(values.min()),
+                "maximum": int(values.max()),
+                "numbers_drawn": len(number_columns),
+            }
+        else:
+            warning = "Number-like columns contain missing or non-integer values; confirm the format manually."
+
+    date_candidates = [
+        str(column)
+        for column in frame.columns
+        if any(token in str(column).lower() for token in ("date", "fecha", "draw_date", "datetime"))
+    ]
+    event_id_candidates = [
+        str(column)
+        for column in frame.columns
+        if str(column).strip().lower() in {
+            "draw_id", "drawid", "event_id", "eventid", "sorteo",
+            "draw_no", "draw_number", "numero_sorteo", "número de sorteo",
+        }
+    ]
+    earliest_draw_date = None
+    if date_candidates:
+        parsed_dates = pd.to_datetime(frame[date_candidates[0]], errors="coerce")
+        if parsed_dates.notna().all():
+            earliest_draw_date = parsed_dates.min().date().isoformat()
+
+    return {
+        "filename": safe_filename,
+        "rows": int(len(frame)),
+        "columns": [str(column) for column in frame.columns],
+        "blank_rows_skipped": blank_rows_skipped,
+        "number_columns": number_columns,
+        "date_columns": date_candidates,
+        "event_id_columns": event_id_candidates,
+        "earliest_draw_date": earliest_draw_date,
+        "suggested_format": suggestion,
+        "warning": warning,
+    }
+
+
 def _resolve_pool_columns(
     frame: pd.DataFrame,
     ruleset_pools: Sequence[NumberPool],
@@ -180,18 +232,26 @@ def preview_csv_schema(
     event_id_candidates = [
         str(column)
         for column in frame.columns
-        if str(column).strip().lower() in {"draw_id", "drawid", "event_id", "eventid", "sorteo", "draw_no"}
+        if str(column).strip().lower() in {
+            "draw_id", "drawid", "event_id", "eventid", "sorteo",
+            "draw_no", "draw_number", "numero_sorteo", "número de sorteo",
+        }
     ]
     session_candidates = [
         str(column)
         for column in frame.columns
         if any(token in str(column).lower() for token in ("session", "turno", "sesion", "draw_time"))
     ]
-    selected_number_columns = {column for columns in pool_suggestions.values() for column in columns}
+    classified_candidates = set(date_candidates + event_id_candidates + session_candidates)
+    classified_candidates.update(
+        column
+        for columns in pool_suggestions.values()
+        for column in columns
+    )
     metadata_candidates = [
         str(column)
         for column in frame.columns
-        if str(column) not in selected_number_columns
+        if str(column) not in classified_candidates
     ]
     suggestions_unambiguous = (
         len(pool_suggestions) == len(pools)

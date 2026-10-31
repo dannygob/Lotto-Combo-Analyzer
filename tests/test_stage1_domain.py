@@ -119,8 +119,7 @@ def test_lottery_ids_are_isolated_by_contract() -> None:
     lottery = Lottery(
         lottery_id="regional-lottery",
         name="Regional Lottery",
-        jurisdiction="Region",
     )
     assert lottery.lottery_id == "regional-lottery"
     with pytest.raises(ValidationError):
-        Lottery(lottery_id="Regional Lottery", name="Invalid", jurisdiction="Region")
+        Lottery(lottery_id="Regional Lottery", name="Invalid")

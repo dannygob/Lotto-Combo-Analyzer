@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import sqlite3
 import json
+import re
+import unicodedata
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,8 +28,7 @@ PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS lotteries (
     lottery_id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    jurisdiction TEXT NOT NULL
+    name TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS rulesets (
@@ -252,6 +253,15 @@ class SQLiteRegistry:
         with self._connection() as connection:
             connection.executescript(_SCHEMA)
             self._migrate_training_runs_for_schema_versions(connection)
+            self._migrate_remove_lottery_jurisdiction(connection)
+
+    @staticmethod
+    def _migrate_remove_lottery_jurisdiction(connection: sqlite3.Connection) -> None:
+        columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(lotteries)")
+        }
+        if "jurisdiction" in columns:
+            connection.execute("ALTER TABLE lotteries DROP COLUMN jurisdiction")
 
     @staticmethod
     def _migrate_training_runs_for_schema_versions(connection: sqlite3.Connection) -> None:
@@ -292,15 +302,207 @@ class SQLiteRegistry:
             connection.execute("DROP TABLE training_runs_legacy")
             break
 
+    def create_lottery(self, name: str) -> Lottery:
+        normalized = unicodedata.normalize("NFKD", name)
+        ascii_name = normalized.encode("ascii", "ignore").decode("ascii").lower()
+        base_id = (re.sub(r"[^a-z0-9]+", "-", ascii_name).strip("-") or "lottery")[:64].rstrip("-")
+        with self._connection() as connection:
+            lottery_id = base_id
+            suffix = 2
+            while connection.execute(
+                "SELECT 1 FROM lotteries WHERE lottery_id = ?",
+                (lottery_id,),
+            ).fetchone():
+                suffix_text = f"-{suffix}"
+                lottery_id = f"{base_id[:64 - len(suffix_text)].rstrip('-')}{suffix_text}"
+                suffix += 1
+            connection.execute(
+                "INSERT INTO lotteries (lottery_id, name) VALUES (?, ?)",
+                (lottery_id, name),
+            )
+        return Lottery(lottery_id=lottery_id, name=name)
+
     def register_lottery(self, lottery: Lottery) -> None:
         with self._connection() as connection:
             connection.execute(
-                "INSERT INTO lotteries (lottery_id, name, jurisdiction) VALUES (?, ?, ?)",
-                (lottery.lottery_id, lottery.name, lottery.jurisdiction),
+                "INSERT INTO lotteries (lottery_id, name) VALUES (?, ?)",
+                (lottery.lottery_id, lottery.name),
             )
+
+    def update_lottery(self, lottery: Lottery) -> bool:
+        with self._connection() as connection:
+            result = connection.execute(
+                """
+                UPDATE lotteries
+                SET name = ?
+                WHERE lottery_id = ?
+                """,
+                (lottery.name, lottery.lottery_id),
+            )
+            return result.rowcount == 1
+
+    def delete_lottery(
+        self,
+        lottery_id: str,
+        *,
+        dataset_directory: str | Path,
+        model_directory: str | Path,
+    ) -> dict[str, object] | None:
+        """Delete a lottery and its dependent records, then remove its stored files."""
+        file_uris: list[str] = []
+        deleted_counts: dict[str, int] = {}
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            exists = connection.execute(
+                "SELECT 1 FROM lotteries WHERE lottery_id = ?",
+                (lottery_id,),
+            ).fetchone()
+            if exists is None:
+                return None
+
+            model_rows = connection.execute(
+                "SELECT artifact_uri FROM model_versions WHERE lottery_id = ?",
+                (lottery_id,),
+            ).fetchall()
+            file_uris.extend(str(row["artifact_uri"]) for row in model_rows)
+            source_rows = connection.execute(
+                """
+                SELECT sha256, storage_uri
+                FROM source_files
+                WHERE sha256 IN (
+                    SELECT source_sha256 FROM draws WHERE lottery_id = ?
+                    UNION
+                    SELECT source_sha256 FROM dataset_versions WHERE lottery_id = ?
+                    UNION
+                    SELECT dataset_sha256 FROM model_versions WHERE lottery_id = ?
+                )
+                """,
+                (lottery_id, lottery_id, lottery_id),
+            ).fetchall()
+
+            delete_statements = (
+                (
+                    "training_runs",
+                    """
+                    DELETE FROM training_runs
+                    WHERE model_version IN (
+                        SELECT model_version FROM model_versions WHERE lottery_id = ?
+                    )
+                    OR dataset_id IN (
+                        SELECT dataset_id FROM dataset_versions WHERE lottery_id = ?
+                    )
+                    """,
+                    (lottery_id, lottery_id),
+                ),
+                (
+                    "draw_numbers",
+                    "DELETE FROM draw_numbers WHERE lottery_id = ?",
+                    (lottery_id,),
+                ),
+                ("draws", "DELETE FROM draws WHERE lottery_id = ?", (lottery_id,)),
+                (
+                    "csv_schema_profiles",
+                    "DELETE FROM csv_schema_profiles WHERE lottery_id = ?",
+                    (lottery_id,),
+                ),
+                (
+                    "ruleset_pools",
+                    "DELETE FROM ruleset_pools WHERE lottery_id = ?",
+                    (lottery_id,),
+                ),
+                ("rulesets", "DELETE FROM rulesets WHERE lottery_id = ?", (lottery_id,)),
+                (
+                    "lottery_schedules",
+                    "DELETE FROM lottery_schedules WHERE lottery_id = ?",
+                    (lottery_id,),
+                ),
+                (
+                    "execution_logs",
+                    "DELETE FROM execution_logs WHERE lottery_id = ?",
+                    (lottery_id,),
+                ),
+                (
+                    "model_versions",
+                    "DELETE FROM model_versions WHERE lottery_id = ?",
+                    (lottery_id,),
+                ),
+                (
+                    "dataset_versions",
+                    "DELETE FROM dataset_versions WHERE lottery_id = ?",
+                    (lottery_id,),
+                ),
+            )
+            for table, statement, parameters in delete_statements:
+                result = connection.execute(statement, parameters)
+                deleted_counts[table] = result.rowcount
+
+            result = connection.execute(
+                "DELETE FROM lotteries WHERE lottery_id = ?",
+                (lottery_id,),
+            )
+            deleted_counts["lotteries"] = result.rowcount
+
+            for row in source_rows:
+                still_referenced = connection.execute(
+                    """
+                    SELECT 1
+                    WHERE EXISTS (SELECT 1 FROM draws WHERE source_sha256 = ?)
+                       OR EXISTS (SELECT 1 FROM dataset_versions WHERE source_sha256 = ?)
+                       OR EXISTS (SELECT 1 FROM model_versions WHERE dataset_sha256 = ?)
+                    """,
+                    (row["sha256"], row["sha256"], row["sha256"]),
+                ).fetchone()
+                if still_referenced is None:
+                    connection.execute(
+                        "DELETE FROM source_files WHERE sha256 = ?",
+                        (row["sha256"],),
+                    )
+                    file_uris.append(str(row["storage_uri"]))
+                    deleted_counts["source_files"] = deleted_counts.get("source_files", 0) + 1
+
+        allowed_directories = [
+            Path(dataset_directory).resolve() / lottery_id,
+            Path(model_directory).resolve() / lottery_id,
+        ]
+        removed_files = 0
+        cleanup_errors: list[dict[str, str]] = []
+        for uri in set(file_uris):
+            if "://" in uri:
+                continue
+            path = Path(uri).resolve()
+            if not any(path.is_relative_to(directory) for directory in allowed_directories):
+                continue
+            try:
+                if path.is_file():
+                    path.unlink()
+                    removed_files += 1
+            except OSError as exc:
+                cleanup_errors.append({"path": str(path), "error": str(exc)})
+
+        return {
+            "lottery_id": lottery_id,
+            "status": "deleted",
+            "deleted_counts": deleted_counts,
+            "files_removed": removed_files,
+            "cleanup_errors": cleanup_errors,
+        }
 
     def register_ruleset(self, ruleset: Ruleset) -> None:
         with self._connection() as connection:
+            connection.execute(
+                """
+                UPDATE rulesets
+                SET effective_to = ?
+                WHERE lottery_id = ?
+                  AND effective_to IS NULL
+                  AND effective_from < ?
+                """,
+                (
+                    ruleset.effective_from.isoformat(),
+                    ruleset.lottery_id,
+                    ruleset.effective_from.isoformat(),
+                ),
+            )
             connection.execute(
                 """
                 INSERT INTO rulesets (lottery_id, version, effective_from, effective_to)
@@ -742,7 +944,7 @@ class SQLiteRegistry:
     def list_lotteries(self) -> list[dict[str, str]]:
         with self._connection() as connection:
             rows = connection.execute(
-                "SELECT lottery_id, name, jurisdiction FROM lotteries ORDER BY lottery_id"
+                "SELECT lottery_id, name FROM lotteries ORDER BY lottery_id"
             ).fetchall()
             return [dict(row) for row in rows]
 

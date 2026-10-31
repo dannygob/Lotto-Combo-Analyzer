@@ -244,12 +244,15 @@ CSV, and its response reports `first_dataset: true` and
 same filename and identical bytes is an idempotent no-op. A changed CSV under
 the same filename creates the next dataset version and a new model candidate.
 
-Before importing, register the lottery and a human-verified ruleset. A
-single-pool ruleset uses inferred `numero N` or `nN` columns. Preview a file
-with `POST /datasets/{lottery_id}/preview`; multiple-pool suggestions are
-returned only when the pool bounds and draw counts identify exactly one valid
-mapping. Otherwise the response sets `confirmation_required` and the mapping
-must be reviewed.
+Before importing, register the lottery and a human-verified ruleset. The web
+interface can inspect a CSV containing a draw number/ID, date, drawn numbers,
+and additional columns. It suggests likely number, date, and event-ID columns,
+but the user confirms each column's role. Observed number range and draw size
+are suggestions only and must be checked against the game's official rules.
+Preview a file with `POST /datasets/{lottery_id}/preview`; multiple-pool
+suggestions are returned only when the pool bounds and draw counts identify
+exactly one valid mapping. Otherwise the response sets `confirmation_required`
+and the mapping must be reviewed.
 
 Persist a confirmed mapping with
 `PUT /lotteries/{lottery_id}/csv-schema-profiles/{ruleset_version}`. A profile
@@ -347,7 +350,7 @@ from src.registry import SQLiteRegistry
 registry = SQLiteRegistry("data/registry.sqlite3")
 registry.initialize()
 registry.register_lottery(
-    Lottery(lottery_id="example-lottery", name="Example", jurisdiction="Example")
+    Lottery(lottery_id="example-lottery", name="Example")
 )
 registry.register_ruleset(
     Ruleset(

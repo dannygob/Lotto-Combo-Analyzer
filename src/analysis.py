@@ -1,4 +1,5 @@
 # analysis.py
+from src.i18n import _ as _
 
 import pandas as pd
 import matplotlib.pyplot as plt

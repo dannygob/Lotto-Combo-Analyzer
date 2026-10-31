@@ -1,0 +1,101 @@
+# French translations for Lotto Combo Analyzer
+msgid ""
+msgstr ""
+"Project-Id-Version: Lotto Combo Analyzer\n"
+"Report-Mailsbug: \n"
+"POT-Creation-Date: 2026-10-31 18:00+0000\n"
+"PO-Revision-Date: 2026-10-31 18:00+0000\n"
+"Last-Translator: French Translator\n"
+"Language: fr\n"
+"Language-Team: French\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit
+
+#: src/analysis.py:34
+msgid "Top {top_n} Most Frequent Numbers"
+msgstr "Top {top_n} Les Numéros Les Plus Fréquents
+
+#: src/analysis.py:59
+msgid "Distribution of Total Sum per Draw"
+msgstr "Distribution de la Somme Totale par Tirage
+
+#: src/analysis.py:64
+msgid "Boxplot of Total Sum per Draw"
+msgstr "Boîte Whisker de la Somme Totale par Tirage
+
+#: src/analysis.py:105
+msgid "Distribution of Differentials Between Draws"
+msgstr "Distribution des Différences entre les Tirages
+
+#: src/analysis.py:113
+msgid "Boxplot of Draw Differentials"
+msgstr "Boîte Whisker des Différences des Tirages
+
+#: src/analysis.py:119
+msgid "Time Series of Draw Differentials"
+msgstr "Série Temporelle des Différences des Tirages
+
+#: src/analysis.py:150
+msgid "Frequency of Changes Between Draws"
+msgstr "Fréquence des Changements entre les Tirages
+
+#: src/analysis.py:80
+msgid "📊 Descriptive Statistics of Total Sum:"
+msgstr "📊 Statistiques Descriptives de la Somme Totale:
+
+#: src/clustering.py:41
+msgid "Elbow Method for Optimal Clusters"
+msgstr "Méthode du Coude pour le Nombre Optimal de Clusters
+
+#: src/clustering.py:58
+msgid "Distribution of Combinations by Cluster"
+msgstr "Distribution des Combinaisons par Cluster
+
+#: src/comparison.py:87
+msgid "🔍 Model Comparison:"
+msgstr "🔍 Comparaison des Modèles:
+
+#: src/comparison.py:88
+msgid "Random Forest Accuracy:"
+msgstr "Précision du Random Forest:
+
+#: src/comparison.py:89
+msgid "Random Forest Log Loss:"
+msgstr "Perte Logarithmique du Random Forest:
+
+#: src/comparison.py:90
+msgid "XGBoost Accuracy:"
+msgstr "Précision de XGBoost:
+
+#: src/comparison.py:91
+msgid "XGBoost Log Loss:"
+msgstr "Perte Logarithmique de XGBoost:
+
+#: src/evaluation.py:44
+msgid "🎯 Group-Level Prediction Accuracy Report"
+msgstr "���� Rapport de Précision au Niveau du Groupe:
+
+#: src/evaluation.py:45
+msgid "Total Predictions:"
+msgstr "Prédictions Totales:
+
+#: src/evaluation.py:46
+msgid "Exact Matches (6/6):"
+msgstr "Matches Exactes (6/6):
+
+#: src/evaluation.py:48
+msgid "Partial Matches ({k}/6):"
+msgstr "Matches Partiels ({k}/6):
+
+#: src/simulation.py:39
+msgid "🎲 Simulated Lottery Combinations:"
+msgstr "🎲 Combinaisons de Loterie Simulées:
+
+#: src/simulation.py:41
+msgid "{i:02d}: {combo}"
+msgstr "{i:02d}: {combo}
+
+#: src/association.py:76
+msgid "Distribution of Lift Values in Association Rules"
+msgstr "Distribution des Valeurs de Lift dans les Règles d'Association

@@ -9,16 +9,24 @@ from typing import Any
 
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.candidate_engine import generate_fixed_size_candidates
 from src.confidence_engine import probabilistic_diagnostics
-from src.csv_learning import import_and_retrain_csv, preview_csv_schema
+from src.csv_learning import import_and_retrain_csv, inspect_csv_draw_format, preview_csv_schema
 from src.domain import CsvSchemaProfile, Draw, Lottery, Ruleset, SourceFile
 from src.draw_schedule import (
     LotterySchedule,
     next_scheduled_event,
     scheduled_session_datetime,
+)
+from src.model_suite import (
+    UniformBaselineModel,
+    FrequencyBaselineModel,
+    TransformerEncoderModel,
+    MixtureDensityNetwork,
+    NormalizingFlowModel,
 )
 from src.registry import SQLiteRegistry
 from src.validation import validate_lottery_frame
@@ -61,6 +69,12 @@ class ModelRegistrationRequest(BaseModel):
     metrics: dict[str, Any]
 
 
+class LotteryNameRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=200)
+
+
 class ApiResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -93,6 +107,12 @@ def create_app(
         version="1.1.0",
         description="Scientific lottery analysis backend for data validation, provenance, and draw ingestion.",
     )
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     app.state.registry = registry
     app.state.registry_path = str(resolved_path)
     app.state.dataset_directory = str(resolved_dataset_directory)
@@ -117,6 +137,16 @@ def create_app(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"lottery {lottery_id!r} was not found")
         return rows
 
+    @app.get("/lotteries/{lottery_id}/rulesets/{ruleset_version}", tags=["registry"])
+    def get_ruleset(lottery_id: str, ruleset_version: str) -> dict[str, Any]:
+        ruleset = registry.get_ruleset(lottery_id, ruleset_version)
+        if ruleset is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"format {ruleset_version!r} was not found for lottery {lottery_id!r}",
+            )
+        return ruleset.model_dump(mode="json")
+
     @app.get("/lotteries/{lottery_id}/draws", tags=["registry"])
     def list_draws(lottery_id: str, limit: int = Query(100, ge=1, le=5000)) -> list[dict[str, Any]]:
         rows = registry.list_draws(lottery_id, limit=limit)
@@ -125,13 +155,42 @@ def create_app(
         return rows
 
     @app.post("/lotteries", tags=["registry"], status_code=status.HTTP_201_CREATED)
-    def create_lottery(payload: Lottery) -> dict[str, str]:
-        registry.register_lottery(payload)
-        return {"lottery_id": payload.lottery_id, "status": "created"}
+    def create_lottery(payload: LotteryNameRequest) -> dict[str, str]:
+        lottery = registry.create_lottery(payload.name)
+        return {"lottery_id": lottery.lottery_id, "status": "created"}
+
+    @app.put("/lotteries/{lottery_id}", tags=["registry"])
+    def update_lottery(lottery_id: str, payload: LotteryNameRequest) -> dict[str, str]:
+        if not registry.update_lottery(Lottery(lottery_id=lottery_id, name=payload.name)):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"lottery {lottery_id!r} was not found",
+            )
+        return {"lottery_id": lottery_id, "status": "updated"}
+
+    @app.delete("/lotteries/{lottery_id}", tags=["registry"])
+    def delete_lottery(lottery_id: str) -> dict[str, object]:
+        result = registry.delete_lottery(
+            lottery_id,
+            dataset_directory=resolved_dataset_directory,
+            model_directory=resolved_model_directory,
+        )
+        if result is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"lottery {lottery_id!r} was not found",
+            )
+        return result
 
     @app.post("/rulesets", tags=["registry"], status_code=status.HTTP_201_CREATED)
     def create_ruleset(payload: Ruleset) -> dict[str, str]:
-        registry.register_ruleset(payload)
+        try:
+            registry.register_ruleset(payload)
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=str(exc),
+            ) from exc
         return {"lottery_id": payload.lottery_id, "version": payload.version, "status": "created"}
 
     @app.post("/draws", tags=["registry"], status_code=status.HTTP_201_CREATED)
@@ -206,6 +265,31 @@ def create_app(
     @app.get("/lotteries/{lottery_id}/training-runs", tags=["datasets"])
     def list_training_runs(lottery_id: str) -> list[dict[str, object]]:
         return registry.list_training_runs(lottery_id)
+
+    @app.post("/datasets/inspect", tags=["datasets"])
+    async def inspect_csv(
+        file: UploadFile = File(...),
+    ) -> dict[str, object]:
+        if not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="uploaded CSV must have a filename",
+            )
+        try:
+            raw_csv = await file.read(MAX_CSV_BYTES + 1)
+            if len(raw_csv) > MAX_CSV_BYTES:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"CSV exceeds the {MAX_CSV_BYTES}-byte upload limit",
+                )
+            return inspect_csv_draw_format(raw_csv, file.filename)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=str(exc),
+            ) from exc
+        finally:
+            await file.close()
 
     @app.post("/datasets/{lottery_id}/preview", tags=["datasets"])
     async def preview_csv(
@@ -644,6 +728,68 @@ def create_app(
             code = status.HTTP_404_NOT_FOUND if str(exc) == "model version does not exist" else status.HTTP_409_CONFLICT
             raise HTTPException(status_code=code, detail=str(exc)) from exc
         return {"model_version": model_version, "status": "active"}
+
+    # ------------------------------------------------------------------
+    # Model‑Suite metadata endpoints
+    # ------------------------------------------------------------------
+    @app.get("/model_suite/uniform-baseline", tags=["model_suite"])
+    def uniform_baseline(domain_size: int = Query(99, ge=2)):
+        """Return info about the UniformBaselineModel."""
+        model = UniformBaselineModel(domain_size=domain_size)
+        return {"model": "UniformBaselineModel", "domain_size": domain_size, "status": "ready"}
+
+    @app.get("/model_suite/frequency-baseline", tags=["model_suite"])
+    def frequency_baseline(lottery_id: str = Query(...)):
+        """Return info about the FrequencyBaselineModel using the dataset for the given lottery."""
+        ds_path = Path(app.state.dataset_directory) / f"{lottery_id}.csv"
+        if not ds_path.exists():
+            raise HTTPException(status_code=404, detail="Dataset not found")
+        df = pd.read_csv(ds_path)
+        combo_cols = [c for c in df.columns if c.startswith("numero ")]
+        if not combo_cols:
+            raise HTTPException(status_code=400, detail="No number columns in dataset")
+        counts = df[combo_cols].values.flatten().astype(int)
+        model = FrequencyBaselineModel(counts=counts)
+        return {"model": "FrequencyBaselineModel", "domain_size": 99, "status": "ready"}
+
+    @app.get("/model_suite/transformer", tags=["model_suite"])
+    def transformer_endpoint(domain_size: int = Query(99, ge=2)):
+        """Return info about the TransformerEncoderModel."""
+        model = TransformerEncoderModel(domain_size=domain_size)
+        return {"model": "TransformerEncoderModel", "domain_size": domain_size, "status": "ready"}
+
+    @app.get("/model_suite/mdn", tags=["model_suite"])
+    def mdn_endpoint(domain_size: int = Query(99, ge=2)):
+        """Return info about the MixtureDensityNetwork model."""
+        model = MixtureDensityNetwork(domain_size=domain_size)
+        return {"model": "MixtureDensityNetwork", "domain_size": domain_size, "status": "ready"}
+
+    @app.get("/model_suite/normalizing-flow", tags=["model_suite"])
+    def normalizing_flow_endpoint(domain_size: int = Query(99, ge=2)):
+        """Return info about the NormalizingFlowModel."""
+        model = NormalizingFlowModel(domain_size=domain_size)
+        return {"model": "NormalizingFlowModel", "domain_size": domain_size, "status": "ready"}
+
+    @app.get("/model_suite/ensemble", tags=["model_suite"])
+    def ensemble_endpoint():
+        """Return info about the adaptive ensemble mechanism."""
+        return {"model": "adaptive_ensemble", "status": "ready"}
+
+    # ------------------------------------------------------------------
+    # Correlation‑matrix endpoint
+    # ------------------------------------------------------------------
+    @app.get("/lotteries/{lottery_id}/correlation-matrix", tags=["datasets"])
+    def correlation_matrix(lottery_id: str):
+        """Compute Pearson correlation matrix for the number columns of the given lottery dataset."""
+        ds_path = Path(app.state.dataset_directory) / f"{lottery_id}.csv"
+        if not ds_path.exists():
+            raise HTTPException(status_code=404, detail="Dataset not found")
+        df = pd.read_csv(ds_path)
+        number_cols = [c for c in df.columns if c.startswith("numero ")]
+        if len(number_cols) < 2:
+            raise HTTPException(status_code=400, detail="Not enough number columns to compute a matrix")
+        mat = df[number_cols].corr()
+        return {"matrix": mat.values.tolist(), "column_names": number_cols}
 
     return app
 

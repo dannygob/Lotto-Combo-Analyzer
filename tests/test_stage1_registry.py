@@ -21,10 +21,10 @@ def create_registry(tmp_path):
     registry = SQLiteRegistry(tmp_path / "registry.sqlite3")
     registry.initialize()
     registry.register_lottery(
-        Lottery(lottery_id="lottery-a", name="Lottery A", jurisdiction="A")
+        Lottery(lottery_id="lottery-a", name="Lottery A")
     )
     registry.register_lottery(
-        Lottery(lottery_id="lottery-b", name="Lottery B", jurisdiction="B")
+        Lottery(lottery_id="lottery-b", name="Lottery B")
     )
     registry.register_ruleset(
         Ruleset(

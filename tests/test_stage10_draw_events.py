@@ -15,9 +15,7 @@ def _register_lottery_and_ruleset(client: TestClient, lottery_id: str, pools: li
     response = client.post(
         "/lotteries",
         json={
-            "lottery_id": lottery_id,
             "name": lottery_id,
-            "jurisdiction": "Test",
         },
     )
     assert response.status_code == 201
@@ -98,6 +96,9 @@ def test_schema_preview_maps_distinct_number_pools_and_api_imports_repeated_date
     assert preview.status_code == 200, preview.text
     preview_payload = preview.json()
     assert preview_payload["mapping_unambiguous"] is True
+    assert preview_payload["date_column_candidates"] == ["draw_date"]
+    assert preview_payload["event_id_column_candidates"] == ["draw_id"]
+    assert preview_payload["other_columns"] == ["draw_note"]
     assert preview_payload["suggested_pool_columns"] == {
         "main": [f"numero {index}" for index in range(1, 6)],
         "bonus": ["numero 6", "numero 7"],
@@ -329,7 +330,7 @@ def test_schedule_configuration_and_next_draw_api(tmp_path) -> None:
     client = TestClient(app)
     assert client.post(
         "/lotteries",
-        json={"lottery_id": "scheduled", "name": "Scheduled", "jurisdiction": "Test"},
+        json={"name": "scheduled"},
     ).status_code == 201
     schedule = {
         "lottery_id": "scheduled",

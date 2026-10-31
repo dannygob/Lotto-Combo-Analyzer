@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lotto-Combo-Analyzer | Research Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-dark-900 text-slate-100 min-h-screen font-sans antialiased flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-dark-700 bg-dark-800/50 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-indigo-600 p-2 rounded-lg text-white font-bold text-xl">🧬</div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">Lotto-Combo-Analyzer</h1>
+                    <p class="text-xs text-slate-400">Scientific Edition v1.1 — Research Framework</p>
+                </div>
+            </div>
+            <!-- API Health Status Indicator -->
+            <div class="flex items-center space-x-2 bg-dark-700/60 px-3 py-1.5 rounded-full text-xs border border-dark-700">
+                <span id="health-dot" class="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse"></span>
+                <span id="health-text" class="text-slate-300 font-medium">Conectando a FastAPI...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Application Container -->
+    <main class="max-w-7xl mx-auto px-4 py-8 flex-grow w-full">
+        
+        <!-- Tab Navigation -->
+        <div class="flex space-x-2 border-b border-dark-700 mb-8 overflow-x-auto pb-2">
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition bg-indigo-600 text-white shadow-lg">
+                📊 Loterías & Registro
+            </button>
+            <button onclick="switchTab('import')" id="btn-import" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
+                📥 Ingesta CSV & Modelos
+            </button>
+            <button onclick="switchTab('schedule')" id="btn-schedule" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
+                📅 Horarios & Sorteos
+            </button>
+            <button onclick="switchTab('predictions')" id="btn-predictions" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
+                🔮 Predicción & Candidatos
+            </button>
+            <button onclick="switchTab('frequency')" id="btn-frequency" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
+                📊 Frecuencia
+            </button>
+            <button onclick="switchTab('clusters')" id="btn-clusters" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
+                🌀 Clusters
+            </button>
+            <button onclick="switchTab('association')" id="btn-association" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
+                🔗 Reglas Asociación
+            </button>
+            <button onclick="switchTab('model-metrics')" id="btn-model-metrics" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
+                📈 Métricas Modelos
+            </button>
+            <button onclick="switchTab('correlation')" id="btn-correlation" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
+                🔢 Correlación
+            </button>
+        </div>
+
+        <nav aria-label="Flujo sugerido" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+            <button onclick="switchTab('dashboard')" class="text-left bg-dark-800 border border-dark-700 hover:border-indigo-500 rounded-xl p-4 transition">
+                <span class="text-xs uppercase tracking-wide text-indigo-400 font-semibold">Paso 1</span>
+                <span class="block text-sm font-medium mt-1">Registrar la lotería</span>
+            </button>
+            <button onclick="switchTab('import')" class="text-left bg-dark-800 border border-dark-700 hover:border-indigo-500 rounded-xl p-4 transition">
+                <span class="text-xs uppercase tracking-wide text-indigo-400 font-semibold">Paso 2</span>
+                <span class="block text-sm font-medium mt-1">Indicar cómo se juega</span>
+                <span class="block text-xs text-slate-400 mt-1">La app sugiere el formato desde tu CSV</span>
+            </button>
+            <button onclick="switchTab('import')" class="text-left bg-dark-800 border border-dark-700 hover:border-indigo-500 rounded-xl p-4 transition">
+                <span class="text-xs uppercase tracking-wide text-indigo-400 font-semibold">Paso 3</span>
+                <span class="block text-sm font-medium mt-1">Revisar e importar el historial</span>
+            </button>
+            <button onclick="switchTab('schedule')" class="text-left bg-dark-800 border border-dark-700 hover:border-indigo-500 rounded-xl p-4 transition">
+                <span class="text-xs uppercase tracking-wide text-indigo-400 font-semibold">Paso 4</span>
+                <span class="block text-sm font-medium mt-1">Consultar sorteos y análisis</span>
+                <span class="block text-xs text-slate-400 mt-1">Puedes cambiar de pestaña cuando quieras</span>
+            </button>
+        </nav>
+
+        <!-- TAB 1: DASHBOARD & LOTTERY REGISTRY -->
+        <section id="tab-dashboard" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Register Lottery Form -->
+                <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                    <h2 id="lottery-form-title" class="text-lg font-semibold mb-4 text-indigo-400">Registrar Nueva Lotería</h2>
+                    <form id="form-lottery" class="space-y-4">
+                        <div>
+                            <label class="block text-xs uppercase font-semibold text-slate-400 mb-1">Nombre</label>
+                            <input type="text" id="lottery_name" placeholder="ej. Power Lotto National" required class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="lottery-submit" type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg text-sm transition">Guardar Lotería</button>
+                            <button id="lottery-cancel-edit" type="button" onclick="cancelEditLottery()" class="hidden bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg text-sm transition">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Lotteries List -->
+                <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-indigo-400">Loterías Registradas</h2>
+                        <button onclick="loadLotteries()" class="text-xs bg-dark-700 hover:bg-dark-600 px-3 py-1 rounded transition">Actualizar</button>
+                    </div>
+                    <div id="lotteries-container" class="overflow-y-auto flex-grow space-y-3 max-h-64">
+                        <p class="text-slate-500 text-sm">Cargando registros...</p>
+                    </div>
+                    <p class="text-xs text-amber-300 mt-3">Eliminar una lotería borra también sus reglas, sorteos, importaciones y modelos relacionados.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 2: CSV IMPORT & PREVIEW -->
+        <section id="tab-import" class="space-y-6 hidden">
+            <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold mb-2 text-indigo-400">Importar historial de sorteos</h2>
+                <p class="text-sm text-slate-400 mb-6">El CSV puede incluir número de sorteo, fecha, números sorteados y otras columnas. Primero indicas qué significa cada columna; las reglas del juego se confirman por separado.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label for="import-lottery-select" class="block text-sm font-semibold text-slate-300 mb-1">1. ¿A qué lotería pertenece?</label>
+                        <select id="import-lottery-select" class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm">
+                            <option value="">Cargando loterías...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="import-file" class="block text-sm font-semibold text-slate-300 mb-1">2. Selecciona el archivo histórico (CSV)</label>
+                        <input type="file" id="import-file" accept=".csv" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500">
+                        <p class="text-xs text-slate-500 mt-1">Tamaño máximo: 25 MB</p>
+                    </div>
+                </div>
+
+                <div id="format-existing" class="hidden bg-dark-900/70 border border-dark-700 rounded-lg p-4 mb-5">
+                    <label for="format-existing-select" class="block text-sm font-semibold text-slate-300 mb-2">Formato del sorteo guardado</label>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <select id="format-existing-select" class="flex-1 bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm"></select>
+                        <button type="button" id="format-new-button" class="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg text-sm transition">Configurar otro formato</button>
+                    </div>
+                </div>
+
+                <div id="format-setup" class="hidden bg-dark-900/70 border border-indigo-700/60 rounded-lg p-4 mb-5">
+                    <h3 class="font-semibold text-indigo-300 mb-1">3. Confirma el formato real del juego</h3>
+                    <p class="text-xs text-amber-200 mb-4">Las sugerencias se calculan mirando este CSV. El historial puede no incluir todos los números; confirma los límites oficiales del juego antes de guardar.</p>
+                    <div id="format-inspection" class="text-xs text-slate-400 mb-4"></div>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label for="format-minimum" class="block text-sm text-slate-300 mb-1">Número válido más bajo</label>
+                            <input type="number" id="format-minimum" min="0" required class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label for="format-maximum" class="block text-sm text-slate-300 mb-1">Número válido más alto</label>
+                            <input type="number" id="format-maximum" min="1" required class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label for="format-count" class="block text-sm text-slate-300 mb-1">Números por sorteo</label>
+                            <input type="number" id="format-count" min="1" required class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                            <label for="format-effective-from" class="block text-sm text-slate-300 mb-1">Desde qué fecha rigen estas reglas</label>
+                            <input type="date" id="format-effective-from" required class="w-full bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm">
+                            <p class="text-xs text-slate-500 mt-1">Si el CSV no tiene fechas, usaremos la fecha de hoy.</p>
+                        </div>
+                    </div>
+                    <label class="flex items-start gap-2 text-xs text-slate-300 mt-4">
+                        <input type="checkbox" id="format-confirmed" class="mt-0.5">
+                        <span>Confirmo que estos valores coinciden con las reglas oficiales de esta lotería.</span>
+                    </label>
+                    <button type="button" id="format-save-button" class="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition">Guardar formato del sorteo</button>
+                </div>
+
+                <div id="format-current" class="hidden bg-emerald-950/40 border border-emerald-800 rounded-lg p-4 mb-5 text-sm text-emerald-200"></div>
+
+                <div id="csv-column-mapping" class="hidden bg-dark-900/70 border border-dark-700 rounded-lg p-4 mb-5">
+                    <h3 class="font-semibold text-indigo-300 mb-1">Indica qué contiene cada columna</h3>
+                    <p class="text-xs text-slate-400 mb-2">Elige “Número sorteado” para las bolas del juego. Las columnas adicionales quedan en el CSV original y no se usan en el análisis.</p>
+                    <p id="csv-pool-guidance" class="text-xs text-indigo-200 mb-4"></p>
+                    <div id="csv-column-roles" class="space-y-2"></div>
+                </div>
+
+                <div id="import-actions" class="hidden">
+                    <label id="chronology-confirmation-container" class="flex items-start gap-2 text-sm text-slate-300 mb-4">
+                        <input type="checkbox" id="chronology-confirmed" class="mt-0.5">
+                        <span>El CSV no tiene fecha. Confirmo que las filas están ordenadas del sorteo más antiguo al más reciente.</span>
+                    </label>
+                    <div class="flex flex-wrap gap-3">
+                        <button type="button" id="preview-csv-button" class="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg text-sm transition">Revisar el archivo</button>
+                        <button type="button" id="upload-csv-button" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm transition">Importar historial</button>
+                    </div>
+                </div>
+                <div id="import-result" class="mt-6 bg-dark-900 p-4 rounded-lg border border-dark-700 text-xs font-mono text-slate-300 overflow-x-auto max-h-96 hidden"></div>
+            </div>
+        </section>
+
+        <!-- TAB 3: SCHEDULES -->
+        <section id="tab-schedule" class="space-y-6 hidden">
+            <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold mb-4 text-indigo-400">Consulta de Próximo Sorteo</h2>
+                <div class="flex gap-4 mb-4">
+                    <input type="text" id="schedule-lottery-id" placeholder="Lottery ID" class="bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm">
+                    <button onclick="fetchNextDraw()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition">Consultar Siguiente Evento</button>
+                </div>
+                <div id="schedule-result" class="bg-dark-900 p-4 rounded-lg border border-dark-700 text-xs font-mono text-slate-300 hidden"></div>
+            </div>
+        </section>
+
+        <!-- TAB 4: PREDICTIONS -->
+        <section id="tab-predictions" class="space-y-6 hidden">
+            <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold mb-4 text-indigo-400">Generación de Candidatos y Probabilidades</h2>
+                <div class="flex gap-4 mb-4">
+                    <input type="text" id="predict-lottery-id" placeholder="Lottery ID" class="bg-dark-900 border border-dark-700 rounded-lg px-3 py-2 text-sm">
+                    <button onclick="fetchPrediction()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition">Ejecutar Predicción</button>
+                </div>
+                <div id="prediction-result" class="bg-dark-900 p-4 rounded-lg border border-dark-700 text-xs font-mono text-slate-300 overflow-x-auto max-h-[500px] hidden"></div>
+            </div>
+        </section>
+
+        <!-- TAB 5: FREQUENCY -->
+        <section id="tab-frequency" class="space-y-6 hidden">
+            <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold mb-4 text-indigo-400" data-i18n="frecuency">Frecuencia de Números</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs border border-dark-700 rounded-lg overflow-hidden">
+                        <thead>
+                        <tr class="text-indigo-400 p-2">
+                            <th class="p-2">Número</th>
+                            <th class="p-2">Frecuencia</th>
+                        </tr>
+                        </thead>
+                        <tbody id="frequency-table">
+                        <!-- filled by UI.js -->
+                        </tbody>
+                    </table>
+                </div>
+                <button onclick="loadFrequency()" class="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition">Cargar datos</button>
+            </div>
+        </section>
+
+        <!-- TAB 6: CLUSTERS -->
+        <section id="tab-clusters" class="space-y-6 hidden">
+            <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold mb-4 text-indigo-400" data-i18n="clusters">Clusters K‑means</h2>
+                <p class="text-slate-400 text-sm mb-4">Asignación de cada sorteo a un cluster (k=5 por defecto).</p>
+                <div id="clusters-table" class="overflow-x-auto"></div>
+                <button onclick="loadClusters()" class="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition">Cargar clusters</button>
+            </div>
+        </section>
+
+        <!-- TAB 7: ASSOCIATION RULES -->
+        <section id="tab-association" class="space-y-6 hidden">
+            <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold mb-4 text-indigo-400" data-i18n="association">Reglas de Asociación (Lift)</h2>
+                <p class="text-slate-400 text-sm mb-4">Top 10 reglas con mayor lift.</p>
+                <div id="association-table" class="overflow-x-auto"></div>
+                <button onclick="loadAssociationRules()" class="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition">Cargar reglas</button>
+            </div>
+        </section>
+
+        <!-- TAB 8: MODEL METRICS -->
+        <section id="tab-model-metrics" class="space-y-6 hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                    <h3 class="text-semibold mb-4 text-indigo-400" data-i18n="model-metrics">LSTM (validación cruzada)</h3>
+                    <div id="lstm-metrics-table" class="overflow-x-auto"></div>
+                </div>
+                <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                    <h3 class="text-semibold mb-4 text-indigo-400" data-i18n="model-metrics">Random Forest vs XGBoost</h3>
+                    <div id="rf-xgb-table" class="overflow-x-auto"></div>
+                </div>
+            </div>
+            <button onclick="loadModelMetrics()" class="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition">Cargar métricas</button>
+        </section>
+
+        <!-- TAB 9: CORRELATION MATRIX -->
+        <section id="tab-correlation" class="space-y-6 hidden">
+            <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                <h2 class="text-lg font-semibold mb-4 text-indigo-400" data-i18n="correlation">Matriz de Correlación</h2>
+                <p class="text-slate-400 text-sm mb-4">Correlación Pearson entre los números del sorteo.</p>
+                <div id="correlation-heatmap" class="min-h-[200px]"></div>
+                <button onclick="loadCorrelationMatrix()" class="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition">Cargar matriz</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-dark-700 py-4 text-center text-xs text-slate-500">
+        Lotto-Combo-Analyzer Scientific Framework &bull; Conectado a FastAPI
+    </footer>
+
+    <!-- Frontend Controller Script -->
+    <script src="js/app.js"></script>
+
+    <!-- i18n strings (generated by the backend or embedded here) -->
+    <script>
+        window.i18n = {
+            "en": {
+                "frecuency": "Frequency",
+                "clusters": "Clusters",
+                "association": "Association Rules",
+                "model-metrics": "Model Metrics",
+                "correlation": "Correlation Matrix",
+                "load": "Load"
+            },
+            "es": {
+                "frecuency": "Frecuencia",
+                "clusters": "Clústeres",
+                "association": "Reglas de Asociación",
+                "model-metrics": "Métricas de Modelos",
+                "correlation": "Matriz de Correlación",
+                "load": "Cargar"
+            },
+            "fr": {
+                "frecuency": "Fréquence",
+                "clusters": "Clusters",
+                "association": "Règles d'association",
+                "model-metrics": "Métriques de modèles",
+                "correlation": "Matrice de corrélation",
+                "load": "Charger"
+            },
+            "de": {
+                "frecuency": "Häufigkeit",
+                "clusters": "Cluster",
+                "association": "assoziierte Regeln",
+                "model-metrics": "Modellmetriken",
+                "correlation": "Korrelationsmatrix",
+                "load": "Laden"
+            }
+        };
+        // detect language from query string (?lang=es) or default to 'en'
+        const urlParams = new URLSearchParams(location.search);
+        const lang = urlParams.get('lang') || 'en';
+        // replace text of elements bearing data-i18n
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.dataset.i18n;
+            const translation = window.i18n[lang][key] || key;
+            el.textContent = translation;
+        });
+    </script>
+</body>
+</html>

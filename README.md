@@ -214,7 +214,7 @@ $$P(S) = P(X_1 = x_1, X_2 = x_2, \dots, X_m = x_m)$$
   $$H(S) = -\sum_{s \in \Omega} P(S=s) \log P(S=s)$$
 
 * **Normalized Combination Entropy:**
-  $$H_{\text{comb\_norm}} = \frac{H(S)}{\log(|\Omega|)}$$
+  $$H_{\text{comb\_norm}} = \frac{H(S)}{\log(\vert{}\Omega\vert{})}$$
 
 ### 5.11 Copula Modeling
 

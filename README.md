@@ -210,11 +210,13 @@ $$P(S) = P(X_1 = x_1, X_2 = x_2, \dots, X_m = x_m)$$
 
 ### 5.10 Combination Entropy
 
-* **Combination Entropy:**
+- **Combination Entropy:**
+
   $$H(S) = -\sum_{s \in \Omega} P(S=s) \log P(S=s)$$
 
-* **Normalized Combination Entropy:**
-  $$H_{\text{comb\_norm}} = \frac{H(S)}{\log(\vert{}\Omega\vert{})}$$
+- **Normalized Combination Entropy:**
+
+  $$H_{\text{comb\_norm}} = \frac{H(S)}{\log(\lvert\Omega\rvert)}$$
 
 ### 5.11 Copula Modeling
 

@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  lotto-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lotto-combo-analyzer
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+    environment:
+      PYTHONPATH: /app
+      LOTTO_REGISTRY_PATH: /app/data/lotto_registry.db
+    command: ["uvicorn", "src.api:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

@@ -1,9 +1,14 @@
 # Core libraries
+pydantic>=2,<3       # Validated Stage 1 domain and API data contracts
+fastapi>=0.110,<1.0  # REST API layer for the lottery validation and registry service
+python-multipart>=0.0.9 # Multipart CSV upload support for retraining
+uvicorn>=0.29,<1.0   # ASGI server for running the FastAPI application
 numpy               # Used for numerical operations and array handling (modeling.py, preprocessing.py)
 pandas              # Used for data manipulation and CSV loading (preprocessing.py, analysis.py)
 scikit-learn        # Used for clustering, Random Forest, and metrics (clustering.py, comparison.py, evaluation.py)
 matplotlib          # Used for visualizations (analysis.py, clustering.py)
 seaborn             # Used for enhanced statistical plots (analysis.py)
+pytest              # Used for the automated test suite and validation gates
 
 # Deep learning
 tensorflow          # Required for building and training the LSTM model (modeling.py)
@@ -24,4 +29,3 @@ jupyter             # Required to run the main notebook (Lotto_Combo_Analyzer.ip
 
 # Optional (if used in utils or notebook)
 python-dotenv       # For environment variable handling (if .env is used)
-

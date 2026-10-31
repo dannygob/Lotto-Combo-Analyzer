@@ -169,6 +169,207 @@ Each lottery entity maintains its own isolated configuration:
 
 > *Note: Ruleset changes are detected automatically but require human verification before registry entry.*
 
+### Stage 4 feature engineering and stability evaluation
+
+The Stage 4 engine, implemented in `src/feature_engineering.py`, computes:
+
+- `S(f) = 1 - sigma(f_t) / mu(f_t)` for per-feature stability,
+- `I(f) = (1 / M) * sum_m I_m(f)` for cross-model feature importance,
+- chronological drift summaries across rolling windows,
+- Monte Carlo stochastic null-hypothesis checks for feature drift under uniform Gaussian noise.
+
+This keeps feature engineering strictly walk-forward, time-ordered, and benchmarked against random baselines rather than assuming that observed structure is predictive.
+
+### Stage 5 model suite
+
+The Stage 5 model suite, implemented in `src/model_suite.py`, includes:
+
+- a uniform baseline and a frequency baseline using empirical counts,
+- a Transformer-like deterministic encoder with softmax probabilities,
+- an XGBoost-compatible proxy for model outputs when the library is unavailable,
+- an MDN-style mixture model and a normalizing-flow proxy,
+- a model ensemble that combines probability vectors with normalized non-negative weights,
+- a Monte Carlo uniform benchmark for the null hypothesis.
+
+All model outputs are validated to remain probability distributions, and the ensemble keeps weighting mathematically valid: Σ w_m = 1 and w_m >= 0.
+
+### Stage 6 calibration and weight-constrained ensemble
+
+The Stage 6 calibration engine, implemented in `src/calibration.py`, covers:
+
+- temperature scaling: q_i = softmax(z_i / T),
+- Platt scaling for binary calibration,
+- isotonic-regression-style monotone calibration,
+- probability-vector normalization after calibration,
+- weighted ensemble fusion with normalized non-negative weights and valid sum-to-one constraints.
+
+This ensures the ensemble maintains a valid probability distribution even after model output calibration.
+
+### Confidence diagnostics and model release gates
+
+`src/confidence_engine.py` evaluates chronological, out-of-sample categorical
+probabilities with multiclass Brier score, log loss, expected calibration error,
+and a paired bootstrap interval against the uniform null. Optional regime labels
+produce separate diagnostics for each regime. The null comparison is evidence
+against uniform probabilities on the supplied test set; it is not proof that
+future lottery draws are predictable.
+
+Feature drift can be checked with Jensen-Shannon divergence using
+`compare_feature_distributions` in `src/feature_engineering.py`. The
+`adaptive_ensemble_weights` helper in `src/model_suite.py` derives non-negative
+weights from chronological validation losses, weighting recent windows more
+heavily. These weights are only meaningful when the losses are genuinely
+out-of-sample and use the same scoring protocol.
+
+Candidate combinations can be selected as a diversified portfolio with
+`select_diverse_candidates` in `src/candidate_engine.py`. It penalizes
+Jaccard overlap between combinations; it does not claim to increase the chance
+of a lottery win.
+
+Model candidates are recorded in SQLite with their dataset SHA-256, artifact
+URI, metrics, and lifecycle state. Promotion is atomic and requires all five
+metrics to be explicitly `true`: `validation_passed`, `leakage_free`,
+`calibration_passed`, `beats_null`, and `drift_within_tolerance`. Promotion
+archives the previous active model for that lottery. This registry gate does
+not train or persist model artifacts itself; a training pipeline must create
+the artifact and report evidence before registration.
+
+### CSV-triggered retraining
+
+`POST /datasets/{lottery_id}/import` accepts a multipart CSV upload and
+revalidates and retrains for each new content hash. The first upload is a
+normal version-1 dataset snapshot: it does not need or compare against an older
+CSV, and its response reports `first_dataset: true` and
+`previous_active_model: null` if there is no active model. Re-uploading the
+same filename and identical bytes is an idempotent no-op. A changed CSV under
+the same filename creates the next dataset version and a new model candidate.
+
+Before importing, register the lottery and a human-verified ruleset. A
+single-pool ruleset uses inferred `numero N` or `nN` columns. Preview a file
+with `POST /datasets/{lottery_id}/preview`; multiple-pool suggestions are
+returned only when the pool bounds and draw counts identify exactly one valid
+mapping. Otherwise the response sets `confirmation_required` and the mapping
+must be reviewed.
+
+Persist a confirmed mapping with
+`PUT /lotteries/{lottery_id}/csv-schema-profiles/{ruleset_version}`. A profile
+binds number-pool columns, optional date/event/session/time columns, explicitly
+allowed attribute columns, ignored columns, and chronological-row-order
+confirmation to one ruleset version. Retrieve it with `GET` on the same path.
+When a profile exists, imports use it for omitted form fields and reject
+missing or newly unclassified CSV columns so schema changes require review.
+Allowed attributes and ignored columns are recorded for provenance; they are
+not automatically used as predictive features.
+
+Repeated dates require a unique event ID, session, or local draw-time identity,
+and a configured schedule or local draw time to establish chronological order.
+Date/session/time combinations and same-day scheduled timestamps must be
+unique. A local draw-time column must use `HH:MM` or `HH:MM:SS`.
+
+Configure the official schedule with
+`PUT /lotteries/{lottery_id}/schedule`. Its JSON contract includes an IANA
+timezone, effective date range, recurring weekday or anchored every-N-days
+sessions, and explicit add/cancel exceptions. Use
+`GET /lotteries/{lottery_id}/next-draw?after=<ISO-8601 timestamp>` to resolve
+the upcoming event; the response includes its stable event ID, local scheduled
+time, session, and timezone. Nonexistent daylight-saving local times are
+rejected. The schedule identifies the event to predict; it does not imply
+number-level predictive evidence.
+
+`GET /lotteries/{lottery_id}/prediction` connects that event resolution to the
+active model artifact. With no target parameters, it predicts for the next
+scheduled event; a caller can instead provide the canonical scheduled
+`event_id` or both `event_date` and `session_id`. The endpoint requires an
+active model whose ruleset matches the target event and whose per-pool
+marginal inclusion probabilities pass shape, bounds, and normalization
+checks. It returns those marginal probabilities and bounded candidate lists.
+For each fixed-size pool, candidate combinations are ranked by a normalized
+conditional-Bernoulli subset distribution. Given per-number inclusion
+propensities `p_i` and a draw size `k`, a subset `S` receives model-implied
+mass proportional to `product(p_i / (1 - p_i))` for `i` in `S`, normalized
+over all size-`k` subsets. The normalizer is computed in log space. This is an
+explicit distributional assumption: conditioning the stored marginal
+estimates this way does not guarantee that the resulting distribution's
+marginals equal the stored estimates. The response exposes
+`model_implied_combination_probability` separately from the marginal values;
+it is not empirically calibrated confidence, a measured chance of winning, or
+evidence of predictability. Candidate `score` remains a simple marginal-based
+ranking diagnostic. The endpoint returns a conflict instead of substituting
+a uniform or stale model when an active compatible artifact is unavailable.
+
+Temporal weekday, month, quarter-of-year, and inter-draw-gap variables are evaluated with
+expanding-window walk-forward Brier comparisons and Holm-Bonferroni correction.
+They remain diagnostics and are not added to the frequency model. A calendar
+effect is not treated as useful unless its out-of-sample evidence passes the
+reported confidence and adjusted-significance checks. Each date must fall
+within the selected ruleset range. Fully empty rows and records with no number
+values are skipped and separately counted in the import response. Partially
+populated draws, non-numeric, out-of-range, or duplicate-within-draw values
+are rejected rather than silently dropped.
+
+For example, after registering the lottery and ruleset:
+
+```shell
+curl.exe -X POST "http://localhost:8000/datasets/example-lottery/import" -F "file=@data/lotto_history.csv" -F "ruleset_version=v1" -F "chronological_order_confirmed=true"
+```
+
+Each accepted upload creates an immutable hash-addressed snapshot under
+`data/datasets/`, a JSON frequency-inclusion model artifact under
+`data/models/`, a dataset-version row, and a training-run record. The current
+trainable implementation is a Laplace-smoothed frequency baseline. It uses
+expanding-window walk-forward validation and compares its multi-label Brier
+score to the uniform inclusion baseline. Promotion happens only if every
+predefined validation, calibration, null-benchmark, and drift gate passes;
+otherwise the new version remains a candidate and the previous active model
+stays active. The first model is subject to the same gates and can remain a
+candidate when evidence is insufficient. This pipeline does not claim that
+lottery outcomes are predictable.
+
+### Stage 1 domain and provenance registry
+
+The Stage 1 contracts are implemented in `src/domain.py` using Pydantic v2, and
+`src/registry.py` persists registry metadata in SQLite. Ruleset validity windows
+are half-open date ranges (`effective_from <= draw_date < effective_to`); a
+missing `effective_to` means the range has no end. Overlapping rulesets for the
+same lottery are rejected, and each draw is bound to the ruleset version valid
+on its draw date. Pools and draw numbers are stored separately so each pool is
+validated against its own rules.
+
+The SQLite registry is metadata and provenance storage, not a replacement for
+the immutable raw CSV, Parquet, or JSONL source files. Register a source file
+by its SHA-256 digest before storing draws that reference it. Initialize and
+use a registry with:
+
+```python
+from src.domain import Lottery, NumberPool, PoolKind, Ruleset
+from src.registry import SQLiteRegistry
+
+registry = SQLiteRegistry("data/registry.sqlite3")
+registry.initialize()
+registry.register_lottery(
+    Lottery(lottery_id="example-lottery", name="Example", jurisdiction="Example")
+)
+registry.register_ruleset(
+    Ruleset(
+        lottery_id="example-lottery",
+        version="v1",
+        effective_from="2020-01-01",
+        pools=(
+            NumberPool(
+                pool_id="main",
+                kind=PoolKind.PRIMARY,
+                minimum=1,
+                maximum=50,
+                numbers_drawn=5,
+            ),
+        ),
+    )
+)
+```
+
+Ruleset registration never infers game rules from the sample CSV. Explicit,
+human-verified pool definitions are required before importing draw records.
+
 ## 5. Mathematical Foundations
 
 ### 5.1 Information Theory
@@ -554,6 +755,7 @@ Phase 5 ──► ML / DL Model Development
 Phase 6 ──► Ensemble Integration
 Phase 7 ──► Walk-Forward Backtesting
 Phase 8 ──► Cross-Lottery Analytics
+Phase 9 ──► Confidence Diagnostics & Model Promotion Governance
 
 ```
 

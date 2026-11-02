@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import sqlite3
 import json
 import math
-from datetime import date, datetime
-from pathlib import Path
-from typing import Any
-
 import pandas as pd
+import sqlite3
+from datetime import date, datetime
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
+from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
+from typing import Any
 
 from src.candidate_engine import generate_fixed_size_candidates
 from src.confidence_engine import probabilistic_diagnostics
@@ -750,6 +749,118 @@ def get_model_improvements_endpoint(lottery_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="No active model found")
     
     return active_model.get("improvements", {})
+
+    // == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
+    // FREQUENCY & CLUSTER
+    ANALYSIS
+    // == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
+
+    / ** Get
+    global frequency
+    metrics
+    for a lottery. * /
+
+        @app.get("/lotteries/{lottery_id}/frequency", tags=["analysis"])
+        async def get_frequency(lottery_id: str) -> APIResponse:
+            """Get frequency metrics for a lottery."""
+            registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
+            lottery = registry.get_lottery(lottery_id)
+            if not lottery:
+                return APIResponse(status="error", message="Lottery not found")
+
+            # Get frequency data from the lottery draws
+            frame = lottery.draws
+            if frame is None or frame.empty:
+                return APIResponse(status="error", message="No draw data available")
+
+            # Calculate number frequencies
+            all_numbers = []
+            for col in frame.columns:
+                col_data = frame[col].dropna().tolist()
+                all_numbers.extend(col_data)
+
+            freq_counter = Counter(all_numbers)
+            total_count = sum(freq_counter.values())
+
+            frequencies = {}
+            for num in sorted(freq_counter.keys()):
+                frequencies[str(num)] = {
+                    "count": freq_counter[num],
+                    "frequency": freq_counter[num] / total_count if total_count > 0 else 0.0,
+                }
+
+            return APIResponse(
+                status="success",
+                message="Frequency metrics retrieved",
+                data={"frequencies": frequencies, "total_draws": len(frame)}
+            )
+
+    / ** Get
+    clustering
+    results
+    for a lottery. * /
+
+        @app.get("/lotteries/{lottery_id}/clusters", tags=["analysis"])
+        async def get_clusters(lottery_id: str, n_clusters: int = 5) -> APIResponse:
+            """Get clustering results for a lottery."""
+            registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
+            lottery = registry.get_lottery(lottery_id)
+            if not lottery:
+                return APIResponse(status="error", message="Lottery not found")
+
+            # Placeholder - actual clustering would use the candidate_engine
+            return APIResponse(
+                status="success",
+                message="Cluster analysis placeholder",
+                data={"n_clusters": n_clusters, "note": "Clustering to be implemented"}
+            )
+
+    / ** Get
+    association
+    rules
+    for a lottery. * /
+
+        @app.get("/lotteries/{lottery_id}/association-rules", tags=["analysis"])
+        async def get_association_rules(lottery_id: str, top_n: int = 10) -> APIResponse:
+            """Get association rules for a lottery."""
+            registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
+            lottery = registry.get_lottery(lottery_id)
+            if not lottery:
+                return APIResponse(status="error", message="Lottery not found")
+
+            # Placeholder - actual association rule mining would use mlxtend
+            return APIResponse(
+                status="success",
+                message="Association rules placeholder",
+                data={"top_n": top_n, "note": "Association rules to be implemented"}
+            )
+
+    / ** Get
+    model
+    performance
+    metrics
+    for a lottery. * /
+
+        @app.get("/lotteries/{lottery_id}/model-metrics", tags=["analysis"])
+        async def get_model_metrics(lottery_id: str) -> APIResponse:
+            """Get model performance metrics for a lottery."""
+            registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
+            lottery = registry.get_lottery(lottery_id)
+            if not lottery:
+                return APIResponse(status="error", message="Lottery not found")
+
+            # Placeholder model metrics
+            return APIResponse(
+                status="success",
+                message="Model metrics retrieved",
+                data={
+                    "models": [],
+                    "metrics": {
+                        "accuracy": 0.0,
+                        "log_loss": 0.0
+                    }
+                }
+            )
 
 
 @app.get("/lotteries/{lottery_id}/sum-distribution/{pool_id}", tags=["analysis"])

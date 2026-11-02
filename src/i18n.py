@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+_CURRENT_LANGUAGE = "en"
+
 # English (default) – identity mapping; every key maps to itself.
 EN_TRANSLATIONS = {
     "frecuency": "Frequency",

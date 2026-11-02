@@ -118,11 +118,11 @@ def rolling_windows(values: ArrayLike, *, window_size: int, step: int = 1) -> li
 
 
 def feature_drift_report(
-    values: ArrayLike,
-    *,
-    feature_name: str = 'feature',
-    window_size: int = 10,
-    step: int = 1,
+        values: ArrayLike,
+        *,
+        feature_name: str = 'feature',
+        window_size: int = 10,
+        step: int = 1,
 ) -> list[FeatureDrift]:
     """Track drift between the first and last rolling windows of a feature time series."""
     series = _to_1d_numeric(values, name=feature_name)
@@ -149,11 +149,11 @@ def feature_drift_report(
 
 
 def compare_feature_distributions(
-    baseline_values: ArrayLike,
-    current_values: ArrayLike,
-    *,
-    bins: int = 10,
-    threshold: float = 0.05,
+        baseline_values: ArrayLike,
+        current_values: ArrayLike,
+        *,
+        bins: int = 10,
+        threshold: float = 0.05,
 ) -> DriftDiagnostic:
     """Compare two chronological feature samples using Jensen-Shannon divergence."""
     baseline = _to_1d_numeric(baseline_values, name="baseline_values")
@@ -181,11 +181,11 @@ def compare_feature_distributions(
 
 
 def monte_carlo_feature_drift_benchmark(
-    *,
-    n_features: int = 10,
-    n_samples: int = 250,
-    seed: int = 42,
-    window_size: int = 25,
+        *,
+        n_features: int = 10,
+        n_samples: int = 250,
+        seed: int = 42,
+        window_size: int = 25,
 ) -> dict[str, float]:
     """Pure H0 benchmark: uniform random noise should not create persistent drift beyond a small tolerance."""
     rng = np.random.default_rng(seed)

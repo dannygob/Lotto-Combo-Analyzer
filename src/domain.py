@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 class PoolKind(StrEnum):
-    """Kinds of independently drawn number pools."""
+    """Types of independently drawn number pools within a lottery."""
 
     PRIMARY = "primary"
     BONUS = "bonus"
@@ -25,21 +25,44 @@ class ExecutionStatus(StrEnum):
     FAILED = "failed"
 
 
+# Reusable validated string types
 Slug = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")]
 Version = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9._+-]*$")]
 Sha256 = Annotated[str, Field(pattern=r"^[a-fA-F0-9]{64}$")]
 
 
 class DomainModel(BaseModel):
+    """
+    Base class for all domain models.
+
+    Enforces:
+        - No extra fields allowed.
+        - Instances are immutable.
+        - Whitespace is stripped from strings.
+    """
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
 
 
 class Lottery(DomainModel):
+    """Lottery metadata including identifier and human-readable name."""
+
     lottery_id: Slug
     name: Annotated[str, Field(min_length=1, max_length=200)]
 
 
 class NumberPool(DomainModel):
+    """
+    Defines a pool of numbers drawn independently within a lottery.
+
+    Attributes:
+        pool_id: Unique identifier for the pool.
+        kind: Pool category (primary, bonus, supplementary).
+        minimum: Minimum number allowed.
+        maximum: Maximum number allowed.
+        numbers_drawn: How many numbers are drawn from this pool.
+        allow_replacement: Whether numbers may repeat.
+    """
+
     pool_id: Slug
     kind: PoolKind
     minimum: Annotated[int, Field(ge=0)]
@@ -49,15 +72,29 @@ class NumberPool(DomainModel):
 
     @model_validator(mode="after")
     def validate_bounds(self) -> NumberPool:
+        """Ensure pool bounds and draw count are logically consistent."""
         if self.minimum > self.maximum:
             raise ValueError("minimum must not exceed maximum")
+
         available = self.maximum - self.minimum + 1
         if self.numbers_drawn > available and not self.allow_replacement:
             raise ValueError("numbers_drawn exceeds pool size without replacement")
+
         return self
 
 
 class Ruleset(DomainModel):
+    """
+    Defines the ruleset for a lottery, including number pools and effective date range.
+
+    Attributes:
+        lottery_id: Identifier of the lottery.
+        version: Version string for the ruleset.
+        effective_from: Start date of ruleset validity.
+        effective_to: Optional end date (exclusive).
+        pools: Tuple of NumberPool definitions.
+    """
+
     lottery_id: Slug
     version: Version
     effective_from: date
@@ -66,16 +103,27 @@ class Ruleset(DomainModel):
 
     @model_validator(mode="after")
     def validate_ruleset(self) -> Ruleset:
+        """Validate date range and uniqueness of pool identifiers."""
         if self.effective_to is not None and self.effective_to <= self.effective_from:
             raise ValueError("effective_to is exclusive and must be after effective_from")
+
         pool_ids = [pool.pool_id for pool in self.pools]
         if len(pool_ids) != len(set(pool_ids)):
             raise ValueError("pool_id values must be unique within a ruleset")
+
         return self
 
 
 class CsvSchemaProfile(DomainModel):
-    """Confirmed CSV column roles scoped to one lottery ruleset."""
+    """
+    Validated mapping of CSV columns to lottery ruleset roles.
+
+    Ensures:
+        - Each pool has at least one column.
+        - No column is assigned to multiple roles.
+        - Attribute and ignored columns contain no duplicates.
+        - All classified columns have exactly one role.
+    """
 
     lottery_id: Slug
     ruleset_version: Version
@@ -84,28 +132,32 @@ class CsvSchemaProfile(DomainModel):
     event_id_column: Annotated[str, Field(min_length=1, max_length=128)] | None = None
     session_column: Annotated[str, Field(min_length=1, max_length=128)] | None = None
     draw_time_column: Annotated[str, Field(min_length=1, max_length=128)] | None = None
-    allowed_attribute_columns: list[Annotated[str, Field(min_length=1, max_length=128)]] = Field(
-        default_factory=list
-    )
-    ignored_columns: list[Annotated[str, Field(min_length=1, max_length=128)]] = Field(
-        default_factory=list
-    )
+    allowed_attribute_columns: list[Annotated[str, Field(min_length=1, max_length=128)]] = Field(default_factory=list)
+    ignored_columns: list[Annotated[str, Field(min_length=1, max_length=128)]] = Field(default_factory=list)
     chronological_order_confirmed: bool = False
 
     @model_validator(mode="after")
     def validate_column_roles(self) -> CsvSchemaProfile:
+        """Ensure column assignments are valid and non-overlapping."""
         flattened_pool_columns = [
             column
             for pool_columns in self.pool_columns.values()
             for column in pool_columns
         ]
+
         if any(not columns for columns in self.pool_columns.values()):
             raise ValueError("each configured number pool must map at least one CSV column")
+
         if len(flattened_pool_columns) != len(set(flattened_pool_columns)):
             raise ValueError("a CSV number column cannot be assigned to multiple pools")
+
         if any(
-            len(columns) != len(set(columns))
-            for columns in (*self.pool_columns.values(), self.allowed_attribute_columns, self.ignored_columns)
+                len(columns) != len(set(columns))
+                for columns in (
+                        *self.pool_columns.values(),
+                        self.allowed_attribute_columns,
+                        self.ignored_columns,
+                )
         ):
             raise ValueError("CSV column lists must not contain duplicates")
 
@@ -119,15 +171,29 @@ class CsvSchemaProfile(DomainModel):
             )
             if column is not None
         ]
-        classified_columns = (
-            role_columns + self.allowed_attribute_columns + self.ignored_columns
-        )
+
+        classified_columns = role_columns + self.allowed_attribute_columns + self.ignored_columns
+
         if len(classified_columns) != len(set(classified_columns)):
             raise ValueError("each CSV column must have exactly one configured role")
+
         return self
 
 
 class Draw(DomainModel):
+    """
+    Represents a single lottery draw with numbers grouped by pool.
+
+    Attributes:
+        lottery_id: Identifier of the lottery.
+        ruleset_version: Version of ruleset used.
+        draw_date: Date of the draw.
+        numbers: Mapping of pool_id → tuple of drawn numbers.
+        source_sha256: SHA256 hash of source file.
+        source_record_number: Row number in the source file.
+        source_reference: Optional external reference.
+    """
+
     lottery_id: Slug
     ruleset_version: Version
     draw_date: date
@@ -139,19 +205,36 @@ class Draw(DomainModel):
     @field_validator("source_sha256")
     @classmethod
     def normalize_sha256(cls, value: str) -> str:
+        """Normalize SHA256 to lowercase."""
         return value.lower()
 
     @model_validator(mode="after")
     def validate_number_groups(self) -> Draw:
+        """Ensure each draw contains at least one non-empty number pool."""
         if not self.numbers:
             raise ValueError("a draw must contain at least one number pool")
+
         for pool_id, numbers in self.numbers.items():
             if not numbers:
                 raise ValueError(f"number pool {pool_id!r} must not be empty")
+
         return self
 
 
 class SourceFile(DomainModel):
+    """
+    Metadata describing a source file used for ingesting lottery draws.
+
+    Includes:
+        - SHA256 checksum
+        - Original filename
+        - Storage URI
+        - Media type
+        - File size
+        - Optional source URL
+        - Timestamp of registration
+    """
+
     sha256: Sha256
     original_name: Annotated[str, Field(min_length=1, max_length=500)]
     storage_uri: Annotated[str, Field(min_length=1, max_length=2000)]
@@ -163,17 +246,33 @@ class SourceFile(DomainModel):
     @field_validator("sha256")
     @classmethod
     def normalize_sha256(cls, value: str) -> str:
+        """Normalize SHA256 to lowercase."""
         return value.lower()
 
     @field_validator("registered_at")
     @classmethod
     def require_timezone(cls, value: datetime) -> datetime:
+        """Ensure timestamps are timezone-aware."""
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("registered_at must be timezone-aware")
         return value.astimezone(timezone.utc)
 
 
 class ExecutionLog(DomainModel):
+    """
+    Execution log for pipeline runs.
+
+    Tracks:
+        - Execution ID
+        - Lottery ID (optional)
+        - Pipeline name
+        - Status (running, succeeded, failed)
+        - Start/finish timestamps
+        - Code version
+        - Configuration JSON
+        - Error message (if failed)
+    """
+
     execution_id: Slug
     lottery_id: Slug | None = None
     pipeline_name: Annotated[str, Field(min_length=1, max_length=200)]
@@ -187,6 +286,7 @@ class ExecutionLog(DomainModel):
     @field_validator("started_at", "finished_at")
     @classmethod
     def normalize_timestamps(cls, value: datetime | None) -> datetime | None:
+        """Ensure timestamps are timezone-aware and normalized to UTC."""
         if value is not None:
             if value.tzinfo is None or value.utcoffset() is None:
                 raise ValueError("execution timestamps must be timezone-aware")
@@ -196,6 +296,7 @@ class ExecutionLog(DomainModel):
     @field_validator("configuration_json")
     @classmethod
     def validate_configuration_json(cls, value: str) -> str:
+        """Ensure configuration_json contains a valid JSON object."""
         import json
 
         parsed = json.loads(value)
@@ -205,14 +306,20 @@ class ExecutionLog(DomainModel):
 
     @model_validator(mode="after")
     def validate_execution_state(self) -> ExecutionLog:
+        """Validate logical consistency of execution timestamps and status."""
         if self.status == ExecutionStatus.RUNNING and self.finished_at is not None:
             raise ValueError("running executions must not have finished_at")
+
         if self.status != ExecutionStatus.RUNNING and self.finished_at is None:
             raise ValueError("completed executions require finished_at")
+
         if self.finished_at is not None and self.finished_at < self.started_at:
             raise ValueError("finished_at must not precede started_at")
+
         if self.status == ExecutionStatus.FAILED and not self.error_message:
             raise ValueError("failed executions require an error_message")
+
         if self.status != ExecutionStatus.FAILED and self.error_message is not None:
             raise ValueError("error_message is only valid for failed executions")
+
         return self

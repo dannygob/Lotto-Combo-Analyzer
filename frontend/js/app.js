@@ -751,5 +751,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('format-save-button').addEventListener('click', saveDrawFormat);
     document.getElementById('preview-csv-button').addEventListener('click', previewCsv);
     document.getElementById('upload-csv-button').addEventListener('click', uploadCsv);
+    document.getElementById('load-pool-metrics').addEventListener('click', () => loadPoolMetrics(selectedLotteryId));
     checkHealth();
 });

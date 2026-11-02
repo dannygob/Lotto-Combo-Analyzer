@@ -75,6 +75,9 @@
             <button onclick="switchTab('correlation')" id="btn-correlation" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
                 🔢 Correlación
             </button>
+            <button onclick="switchTab('pool-metrics')" id="btn-pool-metrics" class="tab-btn px-4 py-2 font-medium text-sm rounded-lg transition text-slate-400 hover:text-white hover:bg-dark-800">
+                📊 Pools
+            </button>
         </div>
 
         <nav aria-label="Flujo sugerido" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
@@ -297,6 +300,27 @@
                 <p class="text-slate-400 text-sm mb-4">Correlación Pearson entre los números del sorteo.</p>
                 <div id="correlation-heatmap" class="min-h-[200px]"></div>
                 <button onclick="loadCorrelationMatrix()" class="mt-4 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition">Cargar matriz</button>
+            </div>
+        </section>
+
+        <!-- Pools Metrics Section -->
+        <section id="tab-pool-metrics" class="space-y-6 hidden">
+            <div class="bg-dark-800 border border-dark-700 rounded-xl p-6 shadow-xl">
+                <h2 class="text-semibold text-indigo-400 mb-4" data-i18n="pool-metrics">Métricas por Pool</h2>
+
+                <!-- Pool 1 -->
+                <div id="pool-1-metrics" class="bg-dark-900 border border-dark-700 rounded-xl p-4 shadow-sm mb-4">
+                    <h3 class="text-semibold mb-3 text-indigo-400">Pool: principal (5 números, 1-52)</h3>
+                    <div id="pool-principal-metrics" class="prose prose-invert"></div>
+                    <div id="pool-principal-frequency" class="prose prose-invert mt-4"></div>
+                </div>
+
+                <!-- Pool 2 -->
+                <div id="pool-2-metrics" class="bg-dark-900 border border-dark-700 rounded-xl p-4 shadow-sm mb-4">
+                    <h3 class="text-semibold mb-3 text-indigo-400">Pool: suplementario (2 números, 1-10)</h3>
+                    <div id="pool-suplementario-metrics" class="prose prose-invert"></div>
+                    <div id="pool-suplementario-frequency" class="prose prose-invert mt-4"></div>
+                </div>
             </div>
         </section>
 

@@ -655,7 +655,134 @@ def create_app(
             ),
         }
 
-    @app.post("/datasets/{lottery_id}/import", tags=["datasets"])
+
+# ============================================================================
+# ENDPOINTS DE MÉTRICAS POR POOL
+# ============================================================================
+
+@app.get("/lotteries/{lottery_id}/pool-metrics/{pool_id}", tags=["analysis"])
+def pool_metrics_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
+    """Return metrics for a specific pool."""
+    active_model = get_active_model(lottery_id)
+    if active_model is None:
+        raise HTTPException(status_code=404, detail="No active model found")
+    
+    metrics = active_model["metrics"]
+    pool_metrics = metrics.get("pool_metrics", {})
+    
+    if pool_id not in pool_metrics:
+        raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
+    
+    return pool_metrics[pool_id]
+
+
+@app.get("/lotteries/{lottery_id}/all-pool-metrics", tags=["analysis"])
+def all_pool_metrics_endpoint(lottery_id: str) -> dict[str, Any]:
+    """Return metrics for all pools."""
+    active_model = get_active_model(lottery_id)
+    if active_model is None:
+        raise HTTPException(status_code=404, detail="No active model found")
+    
+    return active_model["metrics"].get("pool_metrics", {})
+
+
+@app.get("/lotteries/{lottery_id}/pool-frequency/{pool_id}", tags=["analysis"])
+def pool_frequency_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
+    """Return frequency data for a specific pool."""
+    active_model = get_active_model(lottery_id)
+    if active_model is None:
+        raise HTTPException(status_code=404, detail="No active model found")
+    
+    pool_frequency = active_model["metrics"].get("pool_frequency", {})
+    if pool_id not in pool_frequency:
+        raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
+    
+    return pool_frequency[pool_id]
+
+
+@app.get("/lotteries/{lottery_id}/all-pool-frequency", tags=["analysis"])
+def all_pool_frequency_endpoint(lottery_id: str) -> dict[str, Any]:
+    """Return frequency data for all pools."""
+    active_model = get_active_model(lottery_id)
+    if active_model is None:
+        raise HTTPException(status_code=404, detail="No active model found")
+    
+    return active_model["metrics"].get("pool_frequency", {})
+
+
+# ============================================================================
+# ENDPOINTS DE AJUSTE DE MODELO Y DISTRIBUCIÓN DE SUMA
+# ============================================================================
+
+@app.post("/lotteries/{lottery_id}/improve-model", tags=["analysis"])
+def improve_model_endpoint(lottery_id: str) -> dict[str, Any]:
+    """Apply improvements to the model based on metrics."""
+    active_model = get_active_model(lottery_id)
+    if active_model is None:
+        raise HTTPException(status_code=404, detail="No active model found")
+    
+    metrics = active_model["metrics"]
+    pool_metrics = metrics.get("pool_metrics", {})
+    predictions = active_model.get("pool_predictions", {})
+    ruleset = get_ruleset(lottery_id, active_model.get("ruleset_version"))
+    
+    if not ruleset:
+        raise HTTPException(status_code=404, detail="Ruleset not found")
+    
+    improvements = apply_model_improvements(
+        metrics, pool_metrics, predictions, ruleset.pools
+    )
+    
+    active_model["improvements"] = improvements
+    active_model["last_improvement"] = datetime.now(timezone.utc).isoformat()
+    
+    return {
+        "improvements_applied": True,
+        "improvements": improvements,
+    }
+
+
+@app.get("/lotteries/{lottery_id}/model-improvements", tags=["analysis"])
+def get_model_improvements_endpoint(lottery_id: str) -> dict[str, Any]:
+    """Get current model improvements."""
+    active_model = get_active_model(lottery_id)
+    if active_model is None:
+        raise HTTPException(status_code=404, detail="No active model found")
+    
+    return active_model.get("improvements", {})
+
+
+@app.get("/lotteries/{lottery_id}/sum-distribution/{pool_id}", tags=["analysis"])
+def sum_distribution_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
+    """Return sum distribution for a specific pool."""
+    active_model = get_active_model(lottery_id)
+    if active_model is None:
+        raise HTTPException(status_code=404, detail="No active model found")
+    
+    sum_distributions = active_model.get("improvements", {}).get("sum_distributions", {})
+    
+    if pool_id not in sum_distributions:
+        raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
+    
+    return sum_distributions[pool_id]
+
+
+@app.get("/lotteries/{lottery_id}/sum-validation/{pool_id}", tags=["analysis"])
+def sum_validation_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
+    """Return sum validation for a specific pool."""
+    active_model = get_active_model(lottery_id)
+    if active_model is None:
+        raise HTTPException(status_code=404, detail="No active model found")
+    
+    sum_validations = active_model.get("improvements", {}).get("sum_validations", {})
+    
+    if pool_id not in sum_validations:
+        raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
+    
+    return sum_validations[pool_id]
+
+
+@app.post("/datasets/{lottery_id}/import", tags=["datasets"])
     async def import_csv(
         lottery_id: str,
         file: UploadFile = File(...),

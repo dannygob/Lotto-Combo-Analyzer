@@ -764,4 +764,135 @@ Phase 9 ──► Confidence Diagnostics & Model Promotion Governance
 
 ## 22. Version
 
-**Version 1.1 — Scientific Edition**
+---
+
+## 🆕 **NUEVAS CARACTERÍSTICAS v1.2 — Pool Metrics Edition**
+
+### **Métricas por Pool / Pool Metrics**
+
+Cada pool tiene sus propias métricas calculadas de forma independiente:
+
+| Métrica | Descripción | Uso |
+|---------|-------------|-----|
+| **MAE** | Error Absoluto Medio | Error típico en mismas unidades |
+| **MSE** | Error Cuadrático Medio | Penaliza errores grandes |
+| **RMSE** | Raíz del MSE | Combina escala y penalización |
+| **Precision** | Precisión | Menos falsos positivos |
+| **Recall** | Sensibilidad | Menos falsos negativos |
+| **F1 Score** | Media armónica P/R | Equilibrio P/R |
+| **Accuracy** | Exactitud | Total de aciertos |
+| **Log Loss** | Entropía cruzada binaria | Calibración de probabilidades |
+| **Brier Score** | Calibración | Probabilidades realistas |
+| **Matriz Confusión** | TP, FP, FN, TN | Diagnóstico de errores |
+
+### **Distribución de Suma / Sum Distribution**
+
+| Pool | Rango | Suma Mínima | Suma Máxima | Suma Esperada |
+|------|-------|-------------|-------------|---------------|
+| principal (5/52) | 1-52 | 15 | 250 | 132.5 |
+| suplementario (2/10) | 1-10 | 3 | 19 | 11.0 |
+
+### **Endpoints Nuevos / New Endpoints**
+
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| `GET` | `/lotteries/{id}/pool-metrics/{pool_id}` | Métricas de un pool |
+| `GET` | `/lotteries/{id}/all-pool-metrics` | Métricas de todos los pools |
+| `GET` | `/lotteries/{id}/pool-frequency/{pool_id}` | Frecuencias por pool |
+| `GET` | `/lotteries/{id}/all-pool-frequency` | Frecuencias de todos los pools |
+| `POST` | `/lotteries/{id}/improve-model` | Aplicar mejoras |
+| `GET` | `/lotteries/{id}/model-improvements` | Obtener mejoras |
+| `GET` | `/lotteries/{id}/sum-distribution/{pool_id}` | Distribución de suma |
+| `GET` | `/lotteries/{id}/sum-validation/{pool_id}` | Validación de suma |
+
+### **Mejoras del Modelo / Model Improvements**
+
+- **Pesos por Pool**: Se ajustan automáticamente basado en F1 score
+- **Umbral Adaptativo**: Se ajusta según calibración y drift (0.30-0.95)
+- **Detección de Overfitting**: Compara train vs test
+- **Calibración Automática**: Ajusta probabilidades si están sesgadas
+
+### **Frontend - Nuevas Pestañas**
+
+| Pestaña | Contenido |
+|---------|-----------|
+| 📊 **Pools** | Métricas y gráficas separadas por pool |
+| 🔧 **Mejoras Modelo** | Mejoras automáticas y distribución de suma |
+
+---
+
+## 📋 **Ejemplos de Uso**
+
+### **Ejemplo 1: Obtener métricas por pool**
+
+```python
+import requests
+response = requests.get("http://localhost:8000/lotteries/mi-loteria/pool-metrics/principal")
+print(response.json())
+```
+
+### **Ejemplo 2: Aplicar mejoras al modelo**
+
+```python
+import requests
+response = requests.post("http://localhost:8000/lotteries/mi-loteria/improve-model")
+print(response.json())
+```
+
+### **Ejemplo 3: Obtener distribución de suma**
+
+```python
+import requests
+response = requests.get("http://localhost:8000/lotteries/mi-loteria/sum-distribution/principal")
+print(response.json())
+```
+
+---
+
+## ⚠️ **Limitaciones de Investigación**
+
+> 📌 **Advertencia:** El framework **no afirma** que los sorteos de lotería sean predecibles.
+
+| Limitación | Descripción |
+|-----------|-------------|
+| Aleatoriedad inherente | Los sorteos son procesos aleatorios independientes |
+| No hay patrón garantizado | No existe patrón garantizado en sorteos aleatorios |
+| Uso investigativo | Para investigación científica, no apuestas |
+| Riesgo financiero | No usar para apuestas reales |
+
+---
+
+## 📋 **Hoja de Ruta**
+
+```
+Phase 1-8: ✅ Completadas
+Phase 9: ✅ Confidence Diagnostics (Completado)
+Phase 10: ✅ Pool Metrics & Model Improvements (Completado - v1.2)
+```
+
+---
+
+## 📋 **Versión**
+
+**Version 1.2 — Scientific Edition with Pool Metrics**
+
+### Cambios en v1.2:
+- Métricas por pool: MAE, MSE, RMSE, Precision, Recall, F1 por pool
+- Distribución de suma: Cálculo y validación por pool
+- Ajuste de pesos por pool: Pesos dinámicos basados en F1 score
+- Umbral adaptativo: Umbral basado en calibración y drift
+- Endpoints API: 8 nuevos endpoints para pools y mejoras
+- Interfaz: Pestaña "Pools" y "Mejoras Modelo"
+
+---
+
+## 📞 **Contacto**
+
+- Repositorio: https://github.com/dannygob/Lotto-Combo-Analyzer
+- Issues: https://github.com/dannygob/Lotto-Combo-Analyzer/issues
+- Email: dannygob@gmail.com
+
+---
+
+*Última actualización: 2026-11-01*
+*Versión: 1.2 — Scientific Edition with Pool Metrics*

@@ -1,4 +1,5 @@
 # modeling.py
+# LSTM modeling utilities for sequential lottery prediction.
 
 import numpy as np
 import pandas as pd
@@ -11,27 +12,41 @@ from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.utils import to_categorical
 import optuna
 
+
 def prepare_sequences(data, look_back=5, num_classes=52):
     """
     Prepare input-output sequences for LSTM training.
 
+    Each sample:
+        X = previous `look_back` numbers
+        y = next number (categorical)
+
     Parameters:
         data (list): Flattened list of numbers.
-        look_back (int): Number of previous steps to consider.
-        num_classes (int): Total number of classes (lottery numbers).
+        look_back (int): Number of previous steps.
+        num_classes (int): Total number of classes.
 
     Returns:
-        tuple: X (inputs), y_cat (categorical outputs)
+        tuple: (X, y_cat)
+            X: shape (n_samples, look_back, 1)
+            y_cat: one-hot encoded labels
     """
     X, y = [], []
+
     for i in range(len(data) - look_back):
-        if all(1 <= val <= num_classes for val in data[i:i+look_back]) and 1 <= data[i+look_back] <= num_classes:
-            X.append(data[i:i+look_back])
-            y.append(data[i+look_back])
+        window = data[i:i + look_back]
+        next_val = data[i + look_back]
+
+        if all(1 <= val <= num_classes for val in window) and 1 <= next_val <= num_classes:
+            X.append(window)
+            y.append(next_val)
+
     X = np.array(X).reshape((-1, look_back, 1))
     y_adjusted = np.array(y) - 1
     y_cat = to_categorical(y_adjusted, num_classes=num_classes)
+
     return X, y_cat
+
 
 def build_lstm_model(units, look_back, num_classes, lr):
     """
@@ -48,50 +63,55 @@ def build_lstm_model(units, look_back, num_classes, lr):
     """
     model = Sequential()
     model.add(LSTM(units, input_shape=(look_back, 1)))
-    model.add(Dense(num_classes, activation='softmax'))
+    model.add(Dense(num_classes, activation="softmax"))
     model.compile(optimizer=Adam(learning_rate=lr), loss=CategoricalCrossentropy())
     return model
+
 
 def optimize_lstm(X, y_cat, look_back, num_classes, n_trials=20):
     """
     Use Optuna to find optimal LSTM hyperparameters.
 
     Parameters:
-        X (np.array): Input sequences.
-        y_cat (np.array): Categorical outputs.
+        X (np.ndarray): Input sequences.
+        y_cat (np.ndarray): One-hot labels.
         look_back (int): Sequence length.
-        num_classes (int): Number of output classes.
+        num_classes (int): Number of classes.
         n_trials (int): Number of optimization trials.
 
     Returns:
-        dict: Best parameters found.
+        dict: Best hyperparameters.
     """
     def objective(trial):
         units = trial.suggest_int("units", 32, 128)
         lr = trial.suggest_float("lr", 1e-4, 1e-2, log=True)
+
         model = build_lstm_model(units, look_back, num_classes, lr)
         model.fit(X, y_cat, epochs=10, batch_size=32, verbose=0)
-        pred = model.predict(X)
+
+        pred = model.predict(X, verbose=0)
         return log_loss(y_cat, pred)
 
     study = optuna.create_study(direction="minimize")
     study.optimize(objective, n_trials=n_trials)
+
     return study.best_params
+
 
 def cross_validate_model(X, y_cat, best_params, look_back, num_classes, n_splits=5):
     """
     Perform K-Fold cross-validation on the LSTM model.
 
     Parameters:
-        X (np.array): Input sequences.
-        y_cat (np.array): Categorical outputs.
+        X (np.ndarray): Input sequences.
+        y_cat (np.ndarray): One-hot labels.
         best_params (dict): Optimized hyperparameters.
         look_back (int): Sequence length.
-        num_classes (int): Output classes.
+        num_classes (int): Number of classes.
         n_splits (int): Number of folds.
 
     Returns:
-        pd.DataFrame: DataFrame with evaluation metrics.
+        pd.DataFrame: Evaluation metrics per fold.
     """
     kf = KFold(n_splits=n_splits)
     metrics = []
@@ -102,7 +122,8 @@ def cross_validate_model(X, y_cat, best_params, look_back, num_classes, n_splits
 
         model = build_lstm_model(best_params["units"], look_back, num_classes, best_params["lr"])
         model.fit(X_train, y_train, epochs=20, batch_size=32, verbose=0)
-        pred = model.predict(X_val)
+
+        pred = model.predict(X_val, verbose=0)
 
         mse = mean_squared_error(y_val, pred)
         mae = mean_absolute_error(y_val, pred)
@@ -111,29 +132,34 @@ def cross_validate_model(X, y_cat, best_params, look_back, num_classes, n_splits
 
         metrics.append((mse, mae, r2, ll))
 
-    metrics_df = pd.DataFrame(metrics, columns=["MSE", "MAE", "R2", "LogLoss"])
-    return metrics_df
+    return pd.DataFrame(metrics, columns=["MSE", "MAE", "R2", "LogLoss"])
+
 
 def predict_combination(model, X_last, combo_size, history_set):
     """
     Predict a full lottery combination from model output.
 
+    Strategy:
+        - Take top `combo_size` probabilities.
+        - Avoid returning a combination already seen in history_set.
+
     Parameters:
         model (Sequential): Trained LSTM model.
-        X_last (np.array): Last input sequence.
-        combo_size (int): Number of numbers per combination.
-        history_set (set): Set of historical combinations.
+        X_last (np.ndarray): Last input sequence.
+        combo_size (int): Numbers per combination.
+        history_set (set): Historical combinations.
 
     Returns:
         tuple: Predicted combination (sorted).
     """
-    pred = model.predict(X_last.reshape(1, X_last.shape[0], 1))[0]
+    pred = model.predict(X_last.reshape(1, X_last.shape[0], 1), verbose=0)[0]
+
     top_indices = np.argsort(pred)[-combo_size:]
     combo_pred = tuple(sorted(top_indices + 1))
 
     if combo_pred in history_set:
         for i in range(len(pred) - combo_size):
-            alt_combo = tuple(sorted(np.argsort(pred)[i:i+combo_size] + 1))
+            alt_combo = tuple(sorted(np.argsort(pred)[i:i + combo_size] + 1))
             if alt_combo not in history_set:
                 combo_pred = alt_combo
                 break

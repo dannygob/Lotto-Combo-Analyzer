@@ -1,0 +1,1 @@
+C:\Users\compu\AppData\Local\Programs\Python\Python312\python.exe: can't open file 'F:\\Carpeta_danny\\Lotto-Combo-Analyzer\\graficar_distribuciones_y_correlacion.py': [Errno 2] No such file or directory

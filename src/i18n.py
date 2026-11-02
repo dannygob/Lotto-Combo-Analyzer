@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-#: English (default) – identity mapping; every key maps to itself.
+# English (default) – identity mapping; every key maps to itself.
 EN_TRANSLATIONS = {
     "frecuency": "Frequency",
     "clusters": "Clusters",
@@ -14,7 +14,7 @@ EN_TRANSLATIONS = {
     # add more as needed
 }
 
-#: Spanish translations
+# Spanish translations
 ES_TRANSLATIONS = {
     "frecuency": "Frecuencia",
     "clusters": "Clústeres",
@@ -25,7 +25,7 @@ ES_TRANSLATIONS = {
     # add more as needed
 }
 
-#: French translations
+# French translations
 FR_TRANSLATIONS = {
     "frecuency": "Fréquence",
     "clusters": "Clusters",
@@ -36,11 +36,11 @@ FR_TRANSLATIONS = {
     # add more as needed
 }
 
-#: German translations
+# German translations
 DE_TRANSLATIONS = {
     "frecuency": "Häufigkeit",
     "clusters": "Cluster",
-    "association": assoziierte Regeln,
+    "association": "Assoziationsregeln",
     "model-metrics": "Modellmetriken",
     "correlation": "Korrelationsmatrix",
     "load": "Laden",
@@ -65,5 +65,5 @@ def _(text: str, language: str = "en") -> str:
 
 
 def set_language(language: str) -> None:
-    """Set the global language for the application (default: ``'en'``)."""
+    """Set the global language for the application (default: 'en')."""
     pass

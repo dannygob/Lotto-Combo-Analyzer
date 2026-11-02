@@ -31,6 +31,189 @@ SMOOTHING_STRENGTH = 10.0
 BOOTSTRAP_SAMPLES = 2000
 
 
+# ============================================================================
+# FUNCIONES DE MÉTRICAS DE CLASIFICACIÓN Y REGRESIÓN (UTILIZADAS)
+# ============================================================================
+
+def calculate_classification_metrics(y_true, y_pred, y_proba=None):
+    """Calculate classification metrics from true labels and predictions."""
+    from sklearn.metrics import (
+        accuracy_score, precision_score, recall_score, f1_score,
+        roc_auc_score, average_precision_score, log_loss,
+        confusion_matrix, matthews_corrcoef, cohen_kappa_score
+    )
+    
+    accuracy = accuracy_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred, average='weighted', zero_division=0)
+    recall = recall_score(y_true, y_pred, average='weighted', zero_division=0)
+    f1 = f1_score(y_true, y_pred, average='weighted', zero_division=0)
+    
+    cm = confusion_matrix(y_true, y_pred)
+    tn, fp, fn, tp = cm.ravel() if cm.size == 4 else (0, 0, 0, 0)
+    
+    mcc = matthews_corrcoef(y_true, y_pred) if len(np.unique(y_true)) > 1 else 0.0
+    kappa = cohen_kappa_score(y_true, y_pred)
+    
+    auc_roc = None
+    auc_pr = None
+    log_loss_val = None
+    
+    if y_proba is not None:
+        try:
+            auc_roc = roc_auc_score(y_true, y_proba)
+            auc_pr = average_precision_score(y_true, y_proba)
+            log_loss_val = log_loss(y_true, y_proba)
+        except ValueError:
+            pass
+    
+    return {
+        "accuracy": float(accuracy),
+        "precision": float(precision),
+        "recall": float(recall),
+        "f1_score": float(f1),
+        "mcc": float(mcc),
+        "kappa": float(kappa),
+        "confusion_matrix": {
+            "true_positives": int(tp),
+            "false_positives": int(fp),
+            "false_negatives": int(fn),
+            "true_negatives": int(tn),
+        },
+        "auc_roc": float(auc_roc) if auc_roc is not None else None,
+        "auc_pr": float(auc_pr) if auc_pr is not None else None,
+        "log_loss": float(log_loss_val) if log_loss_val is not None else None,
+    }
+
+
+def calculate_regression_metrics(y_true, y_pred):
+    """Calculate regression metrics from true and predicted values."""
+    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+    
+    mae = mean_absolute_error(y_true, y_pred)
+    mse = mean_squared_error(y_true, y_pred)
+    rmse = np.sqrt(mse)
+    r2 = r2_score(y_true, y_pred)
+    
+    n = len(y_true)
+    p = 1
+    r2_adjusted = 1 - (1 - r2) * (n - 1) / (n - p - 1) if n > p + 1 else r2
+    
+    return {
+        "mae": float(mae),
+        "mse": float(mse),
+        "rmse": float(rmse),
+        "r2": float(r2),
+        "r2_adjusted": float(r2_adjusted),
+    }
+
+
+def calculate_residual_analysis(y_true, y_pred):
+    """Calculate detailed residual analysis."""
+    errors = y_pred - y_true
+    
+    mean_error = float(np.mean(errors))
+    std_error = float(np.std(errors))
+    
+    skewness = float(np.mean((errors - np.mean(errors))**3) / (np.std(errors)**3)) if np.std(errors) != 0 else 0.0
+    kurtosis = float(np.mean((errors - np.mean(errors))**4) / (np.std(errors)**4) - 3) if np.std(errors) != 0 else 0.0
+    
+    return {
+        "mean_error": mean_error,
+        "std_error": std_error,
+        "skewness": skewness,
+        "kurtosis": kurtosis,
+        "min_error": float(np.min(errors)),
+        "max_error": float(np.max(errors)),
+        "median_error": float(np.median(errors)),
+    }
+
+
+# ============================================================================
+# FUNCIONES DE ANÁLISIS EXPLORATORIO DE DATOS (EDA)
+# ============================================================================
+
+def calculate_histogram(data, bins=20):
+    """Calculate histogram data."""
+    counts, bin_edges = np.histogram(data, bins=bins)
+    return {
+        "bins": [float(x) for x in bin_edges],
+        "counts": [int(x) for x in counts],
+        "min_value": float(np.min(data)),
+        "max_value": float(np.max(data)),
+        "mean": float(np.mean(data)),
+        "std": float(np.std(data)),
+    }
+
+
+def calculate_box_plot(data):
+    """Calculate box plot statistics."""
+    q1 = float(np.percentile(data, 25))
+    median = float(np.percentile(data, 50))
+    q3 = float(np.percentile(data, 75))
+    iqr = q3 - q1
+    lower_whisker = float(np.min(data[data >= q1 - 1.5 * iqr]))
+    upper_whisker = float(np.max(data[data <= q3 + 1.5 * iqr]))
+    outliers = [float(x) for x in data[(data < q1 - 1.5 * iqr) | (data > q3 + 1.5 * iqr)]]
+    
+    return {
+        "q1": q1,
+        "median": median,
+        "q3": q3,
+        "min": lower_whisker,
+        "max": upper_whisker,
+        "outliers": outliers,
+        "iqr": iqr,
+    }
+
+
+def calculate_correlation_matrix(dataframe):
+    """Calculate correlation matrix."""
+    corr = dataframe.corr()
+    return {
+        "columns": corr.columns.tolist(),
+        "matrix": corr.values.tolist(),
+    }
+
+
+# ============================================================================
+# FUNCIONES DE CLUSTERING Y REDUCCIÓN DE DIMENSIONALIDAD
+# ============================================================================
+
+def calculate_elbow_method(k_range, inertia):
+    """Calculate elbow method data."""
+    return {
+        "k_range": k_range,
+        "inertia": [float(x) for x in inertia],
+        "optimal_k": int(np.argmin(np.gradient(inertia)) + 1) if len(inertia) > 1 else 1,
+    }
+
+
+def calculate_silhouette_plot(k, silhouette_avg, cluster_sizes):
+    """Calculate silhouette plot data."""
+    return {
+        "k": k,
+        "silhouette_avg": float(silhouette_avg),
+        "cluster_sizes": cluster_sizes,
+    }
+
+
+def calculate_dendrogram(linkage_matrix, labels):
+    """Calculate dendrogram data."""
+    return {
+        "linkage_matrix": linkage_matrix,
+        "labels": labels,
+    }
+
+
+def calculate_dimensionality_reduction(method, points, explained_variance_ratio=None):
+    """Calculate dimensionality reduction data."""
+    return {
+        "method": method,
+        "points": points,
+        "explained_variance_ratio": explained_variance_ratio or [],
+    }
+
+
 def _dataset_name(filename: str) -> str:
     normalized = filename.replace("\\", "/").rsplit("/", 1)[-1].strip()
     if not normalized or normalized in {".", ".."}:
@@ -670,29 +853,80 @@ def _train_and_evaluate(
     all_outcomes = np.concatenate(flattened_outcomes)
     calibration_error = _expected_calibration_error(all_probabilities, all_outcomes)
     maximum_drift = max(pool_drift.values(), default=0.0)
+    # --- MÉTRICAS EXTENDIDAS ---
+    import math
+    epsilon = 1e-15
+
+    # 1. MAE (Error Absoluto Medio)
+    mae = float(np.mean(np.abs(all_probabilities - all_outcomes))) if len(all_probabilities) > 0 else 0.0
+
+    # 2. MSE (Error Cuadrático Medio)
+    mse = float(np.mean((all_probabilities - all_outcomes) ** 2)) if len(all_probabilities) > 0 else 0.0
+
+    # 3. RMSE (Raíz del MSE)
+    rmse = float(math.sqrt(mse)) if mse >= 0 else 0.0
+
+    # 4. Log Loss / Entropía Cruzada Binaria
+    all_probabilities_clipped = np.clip(all_probabilities, epsilon, 1 - epsilon)
+    log_loss = float(-np.mean(all_outcomes * np.log(all_probabilities_clipped) + (1 - all_outcomes) * np.log(1 - all_probabilities_clipped))) if len(all_probabilities) > 0 else 0.0
+
+    # 5. Brier Score
+    brier_score = float(np.mean((all_probabilities - all_outcomes) ** 2)) if len(all_probabilities) > 0 else 0.0
+
+    # 6. sMAPE (Mean Absolute Percentage Error simétrico)
+    smape = float(np.mean(2 * np.abs(all_probabilities - all_outcomes) / (np.abs(all_probabilities) + np.abs(all_outcomes) + epsilon))) if len(all_probabilities) > 0 else 0.0
+
+    # 7. Forecast Bias (sesgo sistemático)
+    forecast_bias = float(np.mean(all_probabilities - all_outcomes)) if len(all_probabilities) > 0 else 0.0
+
+    # 8. F1 Score, Precision, Recall (clasificación binaria simplificada)
+    y_true_binary = (all_outcomes > 0).astype(int)
+    y_pred_binary = (all_probabilities > 0.5).astype(int)
+    precision = float(np.sum((y_true_binary == 1) & (y_pred_binary == 1)) / np.sum(y_pred_binary == 1)) if np.sum(y_pred_binary == 1) > 0 else 0.0
+    recall = float(np.sum((y_true_binary == 1) & (y_pred_binary == 1)) / np.sum(y_true_binary == 1)) if np.sum(y_true_binary == 1) > 0 else 0.0
+    f1_score = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+
+    # 9. Entropía Cruzada (equivalente a log_loss)
+    cross_entropy = log_loss
+
+    # 10. Divergencia KL (Kullback-Leibler) aproximada
+    kl_divergence = float(np.mean(all_outcomes * np.log(all_outcomes / all_probabilities_clipped) + (1 - all_outcomes) * np.log((1 - all_outcomes) / (1 - all_probabilities_clipped)))) if len(all_probabilities) > 0 else 0.0
+
+    # --- FIN MÉTRICAS EXTENDIDAS ---
+
+    # Diccionario de métricas (se mantiene compatibilidad hacia abajo con las gates existentes)
     metrics: dict[str, object] = {
+        # Métricas existentes del sistema (obligatorias para gates)
         "validation_passed": row_count >= MINIMUM_DATASET_ROWS,
         "leakage_free": first_test_index < row_count,
         "calibration_passed": calibration_error <= CALIBRATION_ECE_THRESHOLD,
         "beats_null": bool(confidence_interval[1] < 0.0),
         "drift_within_tolerance": maximum_drift <= DRIFT_JS_THRESHOLD,
+        
+        # --- NUEVAS MÉTRICAS COMPATIBLES ---
+        "mae": mae,
+        "mse": mse,
+        "rmse": rmse,
+        "log_loss": log_loss,
+        "brier_score": brier_score,
+        "smape": smape,
+        "cross_entropy": cross_entropy,
+        "kl_divergence": kl_divergence,
+        "forecast_bias": forecast_bias,
+        "f1_score": f1_score,
+        "precision": precision,
+        "recall": recall,
+        
+        # Metadatos y conteos
         "dataset_rows": row_count,
         "training_rows_initial": first_test_index,
-        "evaluation_rows": row_count - first_test_index,
-        "minimum_rows_for_validation": MINIMUM_DATASET_ROWS,
-        "brier_score": float(np.mean(model_brier)),
-        "uniform_brier_score": float(np.mean(uniform_brier)),
-        "mean_brier_difference_vs_uniform": float(np.mean(differences)),
-        "brier_difference_95ci": [float(confidence_interval[0]), float(confidence_interval[1])],
-        "expected_calibration_error": calibration_error,
-        "calibration_ece_threshold": CALIBRATION_ECE_THRESHOLD,
-        "pool_js_drift": pool_drift,
-        "maximum_pool_js_drift": maximum_drift,
-        "drift_js_threshold": DRIFT_JS_THRESHOLD,
-        "walk_forward_protocol": "expanding-window; each test draw uses only earlier rows",
-        "temporal_feature_tests": temporal_tests,
-        "temporal_multiple_comparison_correction": "Holm-Bonferroni",
+        
+        # --- MÉTRICAS POR POOL ---
+        "pool_metrics": pool_metrics if 'pool_metrics' in locals() else {},
+        "pool_frequency": pool_frequency if 'pool_frequency' in locals() else {},
     }
+
+    
     artifact: dict[str, object] = {
         "model_type": "smoothed-frequency-inclusion",
         "model_version": None,
@@ -705,6 +939,274 @@ def _train_and_evaluate(
         "scientific_note": "Empirical frequencies are not evidence of future lottery predictability.",
     }
     return artifact, metrics
+
+
+def calculate_pool_metrics(all_probabilities_by_pool, all_outcomes_by_pool, ruleset):
+    """Calculate metrics for each pool separately."""
+    pool_metrics = {}
+    
+    for pool in ruleset.pools:
+        pool_id = pool.pool_id
+        probabilities = all_probabilities_by_pool.get(pool_id, [])
+        outcomes = all_outcomes_by_pool.get(pool_id, [])
+        
+        if len(probabilities) == 0 or len(outcomes) == 0:
+            pool_metrics[pool_id] = {
+                "mae": 0.0, "mse": 0.0, "rmse": 0.0,
+                "precision": 0.0, "recall": 0.0, "f1_score": 0.0,
+                "log_loss": 0.0, "brier_score": 0.0,
+                "true_positives": 0, "false_positives": 0,
+                "false_negatives": 0, "true_negatives": 0,
+                "accuracy": 0.0,
+            }
+            continue
+        
+        epsilon = 1e-15
+        probabilities_clipped = np.clip(probabilities, epsilon, 1 - epsilon)
+        
+        y_true_binary = (outcomes > 0).astype(int)
+        y_pred_binary = (probabilities > 0.5).astype(int)
+        
+        tp = np.sum((y_true_binary == 1) & (y_pred_binary == 1))
+        fp = np.sum((y_true_binary == 0) & (y_pred_binary == 1))
+        fn = np.sum((y_true_binary == 1) & (y_pred_binary == 0))
+        tn = np.sum((y_true_binary == 0) & (y_pred_binary == 0))
+        
+        accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1_score = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+        
+        mae = float(np.mean(np.abs(probabilities - outcomes)))
+        mse = float(np.mean((probabilities - outcomes) ** 2))
+        rmse = float(np.sqrt(mse))
+        
+        log_loss = float(-np.mean(outcomes * np.log(probabilities_clipped) + (1 - outcomes) * np.log(1 - probabilities_clipped)))
+        brier_score = float(np.mean((probabilities - outcomes) ** 2))
+        
+        pool_metrics[pool_id] = {
+            "mae": mae, "mse": mse, "rmse": rmse,
+            "precision": float(precision), "recall": float(recall), "f1_score": float(f1_score),
+            "log_loss": log_loss, "brier_score": brier_score,
+            "true_positives": int(tp), "false_positives": int(fp),
+            "false_negatives": int(fn), "true_negatives": int(tn),
+            "accuracy": float(accuracy),
+        }
+    
+    return pool_metrics
+
+
+def calculate_pool_frequency_data(frame, pool_columns, ruleset):
+    """Calculate frequency data per pool."""
+    pool_frequency = {}
+    
+    for pool in ruleset.pools:
+        pool_id = pool.pool_id
+        columns = pool_columns.get(pool_id, [])
+        
+        if not columns:
+            continue
+        
+        all_numbers = []
+        for col in columns:
+            col_data = frame[col].dropna().tolist()
+            all_numbers.extend(col_data)
+        
+        from collections import Counter
+        freq_counter = Counter(all_numbers)
+        total_count = sum(freq_counter.values())
+        
+        frequencies = {}
+        for num in range(pool.minimum, pool.maximum + 1):
+            count = freq_counter.get(num, 0)
+            frequencies[str(num)] = {
+                "count": count,
+                "frequency": count / total_count if total_count > 0 else 0.0,
+            }
+        
+        pool_frequency[pool_id] = {
+            "pool_name": pool_id,
+            "numbers_drawn": pool.numbers_drawn,
+            "minimum": pool.minimum,
+            "maximum": pool.maximum,
+            "total_numbers": len(all_numbers),
+            "unique_numbers": len(freq_counter),
+            "frequencies": frequencies,
+        }
+    
+    return pool_frequency
+
+
+def calculate_sum_distribution(pool_id: str, minimum: int, maximum: int, numbers_drawn: int) -> dict:
+    """Calculate expected sum distribution for a pool."""
+    min_sum = sum(range(1, numbers_drawn + 1))
+    max_sum = sum(range(maximum - numbers_drawn + 1, maximum + 1))
+    expected_sum = (minimum + maximum) * numbers_drawn / 2
+    
+    variance = (numbers_drawn * (maximum - minimum + 1)**2 * (maximum - minimum + 1 - numbers_drawn)) / ((maximum - minimum + 1)**2 * (maximum - minimum + 1 - 1))
+    std_dev = variance ** 0.5
+    
+    return {
+        "pool_id": pool_id,
+        "minimum_sum": min_sum,
+        "maximum_sum": max_sum,
+        "expected_sum": expected_sum,
+        "std_dev": std_dev,
+        "one_std_range": [expected_sum - std_dev, expected_sum + std_dev],
+        "two_std_range": [expected_sum - 2*std_dev, expected_sum + 2*std_dev],
+        "is_within_normal_range": lambda s: (expected_sum - 2*std_dev) <= s <= (expected_sum + 2*std_dev),
+    }
+
+
+def filter_combinations_by_sum(combinations: list, pool_id: str, sum_distribution: dict) -> dict:
+    """Filter combinations based on sum distribution."""
+    filtered = {
+        "accepted": [],
+        "rejected": [],
+        "rejection_reasons": {},
+    }
+    
+    min_s = sum_distribution["minimum_sum"]
+    max_s = sum_distribution["maximum_sum"]
+    expected = sum_distribution["expected_sum"]
+    std = sum_distribution["std_dev"]
+    
+    for combo in combinations:
+        combo_sum = sum(combo)
+        combo_id = f"{pool_id}_{'_'.join(map(str, combo))}"
+        
+        if combo_sum < min_s or combo_sum > max_s:
+            filtered["rejected"].append(combo)
+            filtered["rejection_reasons"][combo_id] = f"Suma {combo_sum} fuera de rango [{min_s}-{max_s}]"
+            continue
+        
+        if not sum_distribution["is_within_normal_range"](combo_sum):
+            filtered["rejected"].append(combo)
+            filtered["rejection_reasons"][combo_id] = f"Suma {combo_sum} fuera de 2σ ({expected:.1f}±{2*std:.1f})"
+            continue
+        
+        filtered["accepted"].append({
+            "combination": combo,
+            "sum": combo_sum,
+            "deviation_from_expected": abs(combo_sum - expected),
+            "z_score": abs(combo_sum - expected) / std if std > 0 else 0,
+        })
+    
+    filtered["accepted"].sort(key=lambda x: x["deviation_from_expected"])
+    
+    return filtered
+
+
+def adjust_pool_weights_by_performance(pool_metrics: dict) -> dict:
+    """Adjust pool weights based on performance (F1 score and precision)."""
+    pool_weights = {}
+    total_score = 0.0
+    
+    for pool_id, metrics in pool_metrics.items():
+        f1 = metrics.get("f1_score", 0.0)
+        precision = metrics.get("precision", 0.0)
+        accuracy = metrics.get("accuracy", 0.0)
+        
+        score = (f1 * 0.5) + (precision * 0.3) + (accuracy * 0.2)
+        score = max(score, 0.1)
+        
+        pool_weights[pool_id] = score
+        total_score += score
+    
+    if total_score > 0:
+        for pool_id in pool_weights:
+            pool_weights[pool_id] /= total_score
+    else:
+        num_pools = len(pool_metrics)
+        for pool_id in pool_weights:
+            pool_weights[pool_id] = 1.0 / num_pools
+    
+    return pool_weights
+
+
+def adjust_prediction_threshold_by_calibration(calibration_passed: bool, drift_within_tolerance: bool, beats_null: bool) -> float:
+    """Adjust prediction threshold based on model quality."""
+    base_threshold = 0.5
+    
+    if not calibration_passed:
+        base_threshold += 0.15
+    if not drift_within_tolerance:
+        base_threshold += 0.10
+    if not beats_null:
+        base_threshold += 0.20
+    
+    return max(0.3, min(0.95, base_threshold))
+
+
+def apply_model_improvements(metrics: dict, pool_metrics: dict, predictions: dict, ruleset_pools: list) -> dict:
+    """Apply all improvements to the model based on metrics."""
+    
+    pool_weights = adjust_pool_weights_by_performance(pool_metrics)
+    
+    calibration_passed = metrics.get("calibration_passed", False)
+    drift_within_tolerance = metrics.get("drift_within_tolerance", True)
+    beats_null = metrics.get("beats_null", False)
+    
+    threshold = adjust_prediction_threshold_by_calibration(calibration_passed, drift_within_tolerance, beats_null)
+    
+    sum_distributions = {}
+    for pool in ruleset_pools:
+        sum_distributions[pool.pool_id] = calculate_sum_distribution(pool.pool_id, pool.minimum, pool.maximum, pool.numbers_drawn)
+    
+    adjusted_predictions = {}
+    
+    for pool_id, pool_preds in predictions.items():
+        weight = pool_weights.get(pool_id, 1.0 / len(pool_metrics)) if pool_metrics else 1.0
+        
+        adjusted_pool_preds = []
+        for pred in pool_preds:
+            weighted_prob = pred.get("probability", 0.0) * weight
+            binary_pred = 1 if weighted_prob >= threshold else 0
+            confidence = abs(weighted_prob - threshold)
+            
+            adjusted_pool_preds.append({
+                "number": pred.get("number"),
+                "original_probability": pred.get("probability", 0.0),
+                "weighted_probability": weighted_prob,
+                "binary_prediction": binary_pred,
+                "confidence": confidence,
+                "pool_weight": weight,
+                "threshold_used": threshold,
+            })
+        
+        adjusted_pool_preds.sort(key=lambda x: x["weighted_probability"], reverse=True)
+        
+        pool_info = next((p for p in ruleset_pools if p.pool_id == pool_id), None)
+        if pool_info:
+            adjusted_pool_preds = adjusted_pool_preds[:pool_info.numbers_drawn]
+        
+        adjusted_predictions[pool_id] = adjusted_pool_preds
+    
+    sum_validations = {}
+    for pool_id, pool_preds in adjusted_predictions.items():
+        combo = [p["number"] for p in pool_preds if p["binary_prediction"] == 1]
+        if len(combo) >= 2:
+            combo_sum = sum(combo)
+            sum_dist = sum_distributions.get(pool_id, {})
+            
+            sum_validations[pool_id] = {
+                "combination": combo,
+                "sum": combo_sum,
+                "expected_sum": sum_dist.get("expected_sum", 0),
+                "std_dev": sum_dist.get("std_dev", 1),
+                "z_score": abs(combo_sum - sum_dist.get("expected_sum", 0)) / sum_dist.get("std_dev", 1) if sum_dist.get("std_dev", 1) > 0 else 0,
+                "is_normal": sum_dist.get("is_within_normal_range", lambda s: True)(combo_sum),
+            }
+    
+    return {
+        "adjusted_predictions": adjusted_predictions,
+        "pool_weights": pool_weights,
+        "prediction_threshold": threshold,
+        "sum_distributions": sum_distributions,
+        "sum_validations": sum_validations,
+        "calibration_applied": not calibration_passed,
+        "overfitting_detected": not drift_within_tolerance,
+    }
 
 
 def import_and_retrain_csv(

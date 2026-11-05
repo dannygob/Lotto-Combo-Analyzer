@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import numpy as np
 from dataclasses import dataclass
 from typing import Any, Sequence
-
-import numpy as np
 
 try:
     import torch
@@ -386,3 +385,47 @@ def adaptive_ensemble_weights(
 
     weights = np.exp(logits)
     return weights / weights.sum()
+
+
+# Función para aggarar predicciones de múltiples modelos
+def aggregate_model_predictions(predictions: list, weights: list = None, method: str = "weighted_average") -> dict:
+    """Aggregate model predictions using specified method.
+    
+    Parameters:
+        predictions: list of prediction dicts with 'probability' key
+        weights: list of weights (if None, use equal weights)
+        method: 'weighted_average', 'median', 'max'
+    
+    Returns:
+        dict with aggregated prediction
+    """
+    if not predictions:
+        return {"probability": 0, "numbers": [], "confidence": 0}
+
+    if method == "weighted_average":
+        if weights is None:
+            weights = [1.0 / len(predictions)] * len(predictions)
+        weighted_sum = sum(p.probabilities.sum() * w for p, w in zip(predictions, weights))
+        total_weight = sum(weights)
+        return ModelPrediction(model_name="ensemble", probabilities=np.array([weighted_sum / total_weight]),
+                               metadata={})
+
+    elif method == "median":
+        probabilities = [p.probabilities.sum() for p in predictions]
+        return ModelPrediction(model_name="ensemble",
+                               probabilities=np.array([sorted(probabilities)[len(probabilities) // 2]]), metadata={})
+
+    elif method == "max":
+        best = max(predictions, key=lambda x: x.probabilities.sum())
+        return best
+
+    return predictions[0]
+
+
+# Función para calcular accuracy de un modelo
+def calculate_model_accuracy(y_true, y_pred) -> float:
+    """Calculate accuracy percentage for model predictions."""
+    if len(y_true) == 0 or len(y_pred) == 0:
+        return 0.0
+    correct = sum(1 for a, b in zip(y_true, y_pred) if a == b)
+    return (len(y_true) / len(y_pred)) * 100 if len(y_pred) > 0 else 0.0

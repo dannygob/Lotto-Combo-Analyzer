@@ -4,7 +4,8 @@ import json
 import math
 import pandas as pd
 import sqlite3
-from datetime import date, datetime
+from collections import Counter
+from datetime import date, datetime, timezone
 from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
@@ -75,6 +76,7 @@ class LotteryNameRequest(BaseModel):
 
 
 class ApiResponse(BaseModel):
+    """Standard API response model."""
     model_config = ConfigDict(extra="forbid")
 
     status: str
@@ -82,11 +84,14 @@ class ApiResponse(BaseModel):
     data: dict[str, Any] | None = None
 
 
+APIResponse = ApiResponse
+
+
 def create_app(
-    registry_path: str | Path | None = None,
-    *,
-    dataset_directory: str | Path | None = None,
-    model_directory: str | Path | None = None,
+        registry_path: str | Path | None = None,
+        *,
+        dataset_directory: str | Path | None = None,
+        model_directory: str | Path | None = None,
 ) -> FastAPI:
     """Create a FastAPI application bound to a SQLite registry for lottery metadata and draws."""
     resolved_path = Path(registry_path) if registry_path is not None else DEFAULT_REGISTRY_PATH
@@ -267,7 +272,7 @@ def create_app(
 
     @app.post("/datasets/inspect", tags=["datasets"])
     async def inspect_csv(
-        file: UploadFile = File(...),
+            file: UploadFile = File(...),
     ) -> dict[str, object]:
         if not file.filename:
             raise HTTPException(
@@ -292,9 +297,9 @@ def create_app(
 
     @app.post("/datasets/{lottery_id}/preview", tags=["datasets"])
     async def preview_csv(
-        lottery_id: str,
-        file: UploadFile = File(...),
-        ruleset_version: str = Form(...),
+            lottery_id: str,
+            file: UploadFile = File(...),
+            ruleset_version: str = Form(...),
     ) -> dict[str, object]:
         if not file.filename:
             raise HTTPException(
@@ -335,9 +340,9 @@ def create_app(
         tags=["datasets"],
     )
     def save_csv_schema_profile(
-        lottery_id: str,
-        ruleset_version: str,
-        payload: CsvSchemaProfile,
+            lottery_id: str,
+            ruleset_version: str,
+            payload: CsvSchemaProfile,
     ) -> dict[str, str]:
         if payload.lottery_id != lottery_id or payload.ruleset_version != ruleset_version:
             raise HTTPException(
@@ -415,12 +420,12 @@ def create_app(
 
     @app.get("/lotteries/{lottery_id}/prediction", tags=["predictions"])
     def predict_scheduled_event(
-        lottery_id: str,
-        event_id: str | None = Query(default=None, min_length=1, max_length=256),
-        event_date: date | None = Query(default=None),
-        session_id: str | None = Query(default=None, min_length=1, max_length=64),
-        after: str | None = Query(default=None),
-        candidate_limit: int = Query(default=5, ge=1, le=20),
+            lottery_id: str,
+            event_id: str | None = Query(default=None, min_length=1, max_length=256),
+            event_date: date | None = Query(default=None),
+            session_id: str | None = Query(default=None, min_length=1, max_length=64),
+            after: str | None = Query(default=None),
+            candidate_limit: int = Query(default=5, ge=1, le=20),
     ) -> dict[str, object]:
         schedule = registry.get_lottery_schedule(lottery_id)
         if schedule is None:
@@ -454,7 +459,7 @@ def create_app(
                     detail=str(exc),
                 ) from exc
             if target_date < schedule.effective_from or (
-                schedule.effective_to is not None and target_date >= schedule.effective_to
+                    schedule.effective_to is not None and target_date >= schedule.effective_to
             ):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -475,7 +480,7 @@ def create_app(
                     detail="specify event_date and session_id together, without after or event_id",
                 )
             if event_date < schedule.effective_from or (
-                schedule.effective_to is not None and event_date >= schedule.effective_to
+                    schedule.effective_to is not None and event_date >= schedule.effective_to
             ):
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -514,10 +519,10 @@ def create_app(
             item
             for item in registry.list_rulesets(lottery_id)
             if item["effective_from"] <= target_event["event_date"]
-            and (
-                item["effective_to"] is None
-                or target_event["event_date"] < item["effective_to"]
-            )
+               and (
+                       item["effective_to"] is None
+                       or target_event["event_date"] < item["effective_to"]
+               )
         ]
         if len(applicable_rulesets) != 1:
             raise HTTPException(
@@ -583,25 +588,25 @@ def create_app(
             probabilities = pool_model.get("probabilities")
             expected_size = pool.maximum - pool.minimum + 1
             if (
-                pool_model.get("minimum") != pool.minimum
-                or pool_model.get("maximum") != pool.maximum
-                or pool_model.get("numbers_drawn") != pool.numbers_drawn
-                or not isinstance(probabilities, list)
-                or len(probabilities) != expected_size
-                or any(
-                    isinstance(value, bool)
-                    or not isinstance(value, (int, float))
-                    or not math.isfinite(value)
-                    or value < 0.0
-                    or value > 1.0
-                    for value in probabilities
-                )
-                or not math.isclose(
-                    sum(probabilities),
-                    pool.numbers_drawn,
-                    rel_tol=1e-8,
-                    abs_tol=1e-8,
-                )
+                    pool_model.get("minimum") != pool.minimum
+                    or pool_model.get("maximum") != pool.maximum
+                    or pool_model.get("numbers_drawn") != pool.numbers_drawn
+                    or not isinstance(probabilities, list)
+                    or len(probabilities) != expected_size
+                    or any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value < 0.0
+                or value > 1.0
+                for value in probabilities
+            )
+                    or not math.isclose(
+                sum(probabilities),
+                pool.numbers_drawn,
+                rel_tol=1e-8,
+                abs_tol=1e-8,
+            )
             ):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -654,256 +659,225 @@ def create_app(
             ),
         }
 
+    # ============================================================================
+    # ENDPOINTS DE MÉTRICAS POR POOL
+    # ============================================================================
 
-# ============================================================================
-# ENDPOINTS DE MÉTRICAS POR POOL
-# ============================================================================
+    @app.get("/lotteries/{lottery_id}/pool-metrics/{pool_id}", tags=["analysis"])
+    def pool_metrics_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
+        """Return metrics for a specific pool."""
+        active_model = get_active_model(lottery_id)
+        if active_model is None:
+            raise HTTPException(status_code=404, detail="No active model found")
 
-@app.get("/lotteries/{lottery_id}/pool-metrics/{pool_id}", tags=["analysis"])
-def pool_metrics_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
-    """Return metrics for a specific pool."""
-    active_model = get_active_model(lottery_id)
-    if active_model is None:
-        raise HTTPException(status_code=404, detail="No active model found")
-    
-    metrics = active_model["metrics"]
-    pool_metrics = metrics.get("pool_metrics", {})
-    
-    if pool_id not in pool_metrics:
-        raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
-    
-    return pool_metrics[pool_id]
+        metrics = active_model["metrics"]
+        pool_metrics = metrics.get("pool_metrics", {})
 
+        if pool_id not in pool_metrics:
+            raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
 
-@app.get("/lotteries/{lottery_id}/all-pool-metrics", tags=["analysis"])
-def all_pool_metrics_endpoint(lottery_id: str) -> dict[str, Any]:
-    """Return metrics for all pools."""
-    active_model = get_active_model(lottery_id)
-    if active_model is None:
-        raise HTTPException(status_code=404, detail="No active model found")
-    
-    return active_model["metrics"].get("pool_metrics", {})
+        return pool_metrics[pool_id]
 
+    @app.get("/lotteries/{lottery_id}/all-pool-metrics", tags=["analysis"])
+    def all_pool_metrics_endpoint(lottery_id: str) -> dict[str, Any]:
+        """Return metrics for all pools."""
+        active_model = get_active_model(lottery_id)
+        if active_model is None:
+            raise HTTPException(status_code=404, detail="No active model found")
 
-@app.get("/lotteries/{lottery_id}/pool-frequency/{pool_id}", tags=["analysis"])
-def pool_frequency_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
-    """Return frequency data for a specific pool."""
-    active_model = get_active_model(lottery_id)
-    if active_model is None:
-        raise HTTPException(status_code=404, detail="No active model found")
-    
-    pool_frequency = active_model["metrics"].get("pool_frequency", {})
-    if pool_id not in pool_frequency:
-        raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
-    
-    return pool_frequency[pool_id]
+        return active_model["metrics"].get("pool_metrics", {})
 
+    @app.get("/lotteries/{lottery_id}/pool-frequency/{pool_id}", tags=["analysis"])
+    def pool_frequency_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
+        """Return frequency data for a specific pool."""
+        active_model = get_active_model(lottery_id)
+        if active_model is None:
+            raise HTTPException(status_code=404, detail="No active model found")
 
-@app.get("/lotteries/{lottery_id}/all-pool-frequency", tags=["analysis"])
-def all_pool_frequency_endpoint(lottery_id: str) -> dict[str, Any]:
-    """Return frequency data for all pools."""
-    active_model = get_active_model(lottery_id)
-    if active_model is None:
-        raise HTTPException(status_code=404, detail="No active model found")
-    
-    return active_model["metrics"].get("pool_frequency", {})
+        pool_frequency = active_model["metrics"].get("pool_frequency", {})
+        if pool_id not in pool_frequency:
+            raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
 
+        return pool_frequency[pool_id]
 
-# ============================================================================
-# ENDPOINTS DE AJUSTE DE MODELO Y DISTRIBUCIÓN DE SUMA
-# ============================================================================
+    @app.get("/lotteries/{lottery_id}/all-pool-frequency", tags=["analysis"])
+    def all_pool_frequency_endpoint(lottery_id: str) -> dict[str, Any]:
+        """Return frequency data for all pools."""
+        active_model = get_active_model(lottery_id)
+        if active_model is None:
+            raise HTTPException(status_code=404, detail="No active model found")
 
-@app.post("/lotteries/{lottery_id}/improve-model", tags=["analysis"])
-def improve_model_endpoint(lottery_id: str) -> dict[str, Any]:
-    """Apply improvements to the model based on metrics."""
-    active_model = get_active_model(lottery_id)
-    if active_model is None:
-        raise HTTPException(status_code=404, detail="No active model found")
-    
-    metrics = active_model["metrics"]
-    pool_metrics = metrics.get("pool_metrics", {})
-    predictions = active_model.get("pool_predictions", {})
-    ruleset = get_ruleset(lottery_id, active_model.get("ruleset_version"))
-    
-    if not ruleset:
-        raise HTTPException(status_code=404, detail="Ruleset not found")
-    
-    improvements = apply_model_improvements(
-        metrics, pool_metrics, predictions, ruleset.pools
-    )
-    
-    active_model["improvements"] = improvements
-    active_model["last_improvement"] = datetime.now(timezone.utc).isoformat()
-    
-    return {
-        "improvements_applied": True,
-        "improvements": improvements,
-    }
+        return active_model["metrics"].get("pool_frequency", {})
 
+    # ============================================================================
+    # ENDPOINTS DE AJUSTE DE MODELO Y DISTRIBUCIÓN DE SUMA
+    # ============================================================================
 
-@app.get("/lotteries/{lottery_id}/model-improvements", tags=["analysis"])
-def get_model_improvements_endpoint(lottery_id: str) -> dict[str, Any]:
-    """Get current model improvements."""
-    active_model = get_active_model(lottery_id)
-    if active_model is None:
-        raise HTTPException(status_code=404, detail="No active model found")
-    
-    return active_model.get("improvements", {})
+    @app.post("/lotteries/{lottery_id}/improve-model", tags=["analysis"])
+    def improve_model_endpoint(lottery_id: str) -> dict[str, Any]:
+        """Apply improvements to the model based on metrics."""
+        active_model = get_active_model(lottery_id)
+        if active_model is None:
+            raise HTTPException(status_code=404, detail="No active model found")
 
-    // == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
-    // FREQUENCY & CLUSTER
-    ANALYSIS
-    // == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
+        metrics = active_model["metrics"]
+        pool_metrics = metrics.get("pool_metrics", {})
+        predictions = active_model.get("pool_predictions", {})
+        ruleset = get_ruleset(lottery_id, active_model.get("ruleset_version"))
 
-    / ** Get
-    global frequency
-    metrics
-    for a lottery. * /
+        if not ruleset:
+            raise HTTPException(status_code=404, detail="Ruleset not found")
 
-        @app.get("/lotteries/{lottery_id}/frequency", tags=["analysis"])
-        async def get_frequency(lottery_id: str) -> APIResponse:
-            """Get frequency metrics for a lottery."""
-            registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
-            lottery = registry.get_lottery(lottery_id)
-            if not lottery:
-                return APIResponse(status="error", message="Lottery not found")
+        improvements = apply_model_improvements(
+            metrics, pool_metrics, predictions, ruleset.pools
+        )
 
-            # Get frequency data from the lottery draws
-            frame = lottery.draws
-            if frame is None or frame.empty:
-                return APIResponse(status="error", message="No draw data available")
+        active_model["improvements"] = improvements
+        active_model["last_improvement"] = datetime.now(timezone.utc).isoformat()
 
-            # Calculate number frequencies
-            all_numbers = []
-            for col in frame.columns:
-                col_data = frame[col].dropna().tolist()
-                all_numbers.extend(col_data)
+        return {
+            "improvements_applied": True,
+            "improvements": improvements,
+        }
 
-            freq_counter = Counter(all_numbers)
-            total_count = sum(freq_counter.values())
+    @app.get("/lotteries/{lottery_id}/model-improvements", tags=["analysis"])
+    def get_model_improvements_endpoint(lottery_id: str) -> dict[str, Any]:
+        """Get current model improvements."""
+        active_model = get_active_model(lottery_id)
+        if active_model is None:
+            raise HTTPException(status_code=404, detail="No active model found")
 
-            frequencies = {}
-            for num in sorted(freq_counter.keys()):
-                frequencies[str(num)] = {
-                    "count": freq_counter[num],
-                    "frequency": freq_counter[num] / total_count if total_count > 0 else 0.0,
+        return active_model.get("improvements", {})
+
+    # == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
+    # FREQUENCY & CLUSTER ANALYSIS
+    # == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == ==
+
+    @app.get("/lotteries/{lottery_id}/frequency", tags=["analysis"])
+    async def get_frequency(lottery_id: str) -> APIResponse:
+        """Get frequency metrics for a lottery."""
+        registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
+        lottery = registry.get_lottery(lottery_id)
+        if not lottery:
+            return APIResponse(status="error", message="Lottery not found")
+
+        # Get frequency data from the lottery draws
+        frame = lottery.draws
+        if frame is None or frame.empty:
+            return APIResponse(status="error", message="No draw data available")
+
+        # Calculate number frequencies
+        all_numbers = []
+        for col in frame.columns:
+            col_data = frame[col].dropna().tolist()
+            all_numbers.extend(col_data)
+
+        freq_counter = Counter(all_numbers)
+        total_count = sum(freq_counter.values())
+
+        frequencies = {}
+        for num in sorted(freq_counter.keys()):
+            frequencies[str(num)] = {
+                "count": freq_counter[num],
+                "frequency": freq_counter[num] / total_count if total_count > 0 else 0.0,
+            }
+
+        return APIResponse(
+            status="success",
+            message="Frequency metrics retrieved",
+            data={"frequencies": frequencies, "total_draws": len(frame)}
+        )
+
+    @app.get("/lotteries/{lottery_id}/clusters", tags=["analysis"])
+    async def get_clusters(lottery_id: str, n_clusters: int = 5) -> APIResponse:
+        """Get clustering results for a lottery."""
+        registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
+        lottery = registry.get_lottery(lottery_id)
+        if not lottery:
+            return APIResponse(status="error", message="Lottery not found")
+
+        # Placeholder - actual clustering would use the candidate_engine
+        return APIResponse(
+            status="success",
+            message="Cluster analysis placeholder",
+            data={"n_clusters": n_clusters, "note": "Clustering to be implemented"}
+        )
+
+    @app.get("/lotteries/{lottery_id}/association-rules", tags=["analysis"])
+    async def get_association_rules(lottery_id: str, top_n: int = 10) -> APIResponse:
+        """Get association rules for a lottery."""
+        registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
+        lottery = registry.get_lottery(lottery_id)
+        if not lottery:
+            return APIResponse(status="error", message="Lottery not found")
+
+        # Placeholder - actual association rule mining would use mlxtend
+        return APIResponse(
+            status="success",
+            message="Association rules placeholder",
+            data={"top_n": top_n, "note": "Association rules to be implemented"}
+        )
+
+    @app.get("/lotteries/{lottery_id}/model-metrics", tags=["analysis"])
+    async def get_model_metrics(lottery_id: str) -> APIResponse:
+        """Get model performance metrics for a lottery."""
+        registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
+        lottery = registry.get_lottery(lottery_id)
+        if not lottery:
+            return APIResponse(status="error", message="Lottery not found")
+
+        # Placeholder model metrics
+        return APIResponse(
+            status="success",
+            message="Model metrics retrieved",
+            data={
+                "models": [],
+                "metrics": {
+                    "accuracy": 0.0,
+                    "log_loss": 0.0
                 }
+            }
+        )
 
-            return APIResponse(
-                status="success",
-                message="Frequency metrics retrieved",
-                data={"frequencies": frequencies, "total_draws": len(frame)}
-            )
+    @app.get("/lotteries/{lottery_id}/sum-distribution/{pool_id}", tags=["analysis"])
+    def sum_distribution_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
+        """Return sum distribution for a specific pool."""
+        active_model = get_active_model(lottery_id)
+        if active_model is None:
+            raise HTTPException(status_code=404, detail="No active model found")
 
-    / ** Get
-    clustering
-    results
-    for a lottery. * /
+        sum_distributions = active_model.get("improvements", {}).get("sum_distributions", {})
 
-        @app.get("/lotteries/{lottery_id}/clusters", tags=["analysis"])
-        async def get_clusters(lottery_id: str, n_clusters: int = 5) -> APIResponse:
-            """Get clustering results for a lottery."""
-            registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
-            lottery = registry.get_lottery(lottery_id)
-            if not lottery:
-                return APIResponse(status="error", message="Lottery not found")
+        if pool_id not in sum_distributions:
+            raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
 
-            # Placeholder - actual clustering would use the candidate_engine
-            return APIResponse(
-                status="success",
-                message="Cluster analysis placeholder",
-                data={"n_clusters": n_clusters, "note": "Clustering to be implemented"}
-            )
+        return sum_distributions[pool_id]
 
-    / ** Get
-    association
-    rules
-    for a lottery. * /
+    @app.get("/lotteries/{lottery_id}/sum-validation/{pool_id}", tags=["analysis"])
+    def sum_validation_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
+        """Return sum validation for a specific pool."""
+        active_model = get_active_model(lottery_id)
+        if active_model is None:
+            raise HTTPException(status_code=404, detail="No active model found")
 
-        @app.get("/lotteries/{lottery_id}/association-rules", tags=["analysis"])
-        async def get_association_rules(lottery_id: str, top_n: int = 10) -> APIResponse:
-            """Get association rules for a lottery."""
-            registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
-            lottery = registry.get_lottery(lottery_id)
-            if not lottery:
-                return APIResponse(status="error", message="Lottery not found")
+        sum_validations = active_model.get("improvements", {}).get("sum_validations", {})
 
-            # Placeholder - actual association rule mining would use mlxtend
-            return APIResponse(
-                status="success",
-                message="Association rules placeholder",
-                data={"top_n": top_n, "note": "Association rules to be implemented"}
-            )
+        if pool_id not in sum_validations:
+            raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
 
-    / ** Get
-    model
-    performance
-    metrics
-    for a lottery. * /
+        return sum_validations[pool_id]
 
-        @app.get("/lotteries/{lottery_id}/model-metrics", tags=["analysis"])
-        async def get_model_metrics(lottery_id: str) -> APIResponse:
-            """Get model performance metrics for a lottery."""
-            registry = SQLiteRegistry(DEFAULT_REGISTRY_PATH)
-            lottery = registry.get_lottery(lottery_id)
-            if not lottery:
-                return APIResponse(status="error", message="Lottery not found")
-
-            # Placeholder model metrics
-            return APIResponse(
-                status="success",
-                message="Model metrics retrieved",
-                data={
-                    "models": [],
-                    "metrics": {
-                        "accuracy": 0.0,
-                        "log_loss": 0.0
-                    }
-                }
-            )
-
-
-@app.get("/lotteries/{lottery_id}/sum-distribution/{pool_id}", tags=["analysis"])
-def sum_distribution_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
-    """Return sum distribution for a specific pool."""
-    active_model = get_active_model(lottery_id)
-    if active_model is None:
-        raise HTTPException(status_code=404, detail="No active model found")
-    
-    sum_distributions = active_model.get("improvements", {}).get("sum_distributions", {})
-    
-    if pool_id not in sum_distributions:
-        raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
-    
-    return sum_distributions[pool_id]
-
-
-@app.get("/lotteries/{lottery_id}/sum-validation/{pool_id}", tags=["analysis"])
-def sum_validation_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
-    """Return sum validation for a specific pool."""
-    active_model = get_active_model(lottery_id)
-    if active_model is None:
-        raise HTTPException(status_code=404, detail="No active model found")
-    
-    sum_validations = active_model.get("improvements", {}).get("sum_validations", {})
-    
-    if pool_id not in sum_validations:
-        raise HTTPException(status_code=404, detail=f"Pool {pool_id} not found")
-    
-    return sum_validations[pool_id]
-
-
-@app.post("/datasets/{lottery_id}/import", tags=["datasets"])
+    @app.post("/datasets/{lottery_id}/import", tags=["datasets"])
     async def import_csv(
-        lottery_id: str,
-        file: UploadFile = File(...),
-        ruleset_version: str = Form(...),
-        date_column: str | None = Form(default=None),
-        event_id_column: str | None = Form(default=None),
-        session_column: str | None = Form(default=None),
-        draw_time_column: str | None = Form(default=None),
-        chronological_order_confirmed: bool | None = Form(default=None),
-        pool_columns: str | None = Form(default=None),
+            lottery_id: str,
+            file: UploadFile = File(...),
+            ruleset_version: str = Form(...),
+            date_column: str | None = Form(default=None),
+            event_id_column: str | None = Form(default=None),
+            session_column: str | None = Form(default=None),
+            draw_time_column: str | None = Form(default=None),
+            chronological_order_confirmed: bool | None = Form(default=None),
+            pool_columns: str | None = Form(default=None),
     ) -> dict[str, object]:
         if not file.filename:
             raise HTTPException(
@@ -921,10 +895,10 @@ def sum_validation_endpoint(lottery_id: str, pool_id: str) -> dict[str, Any]:
             if pool_columns is not None:
                 parsed_mapping = json.loads(pool_columns)
                 if not isinstance(parsed_mapping, dict) or any(
-                    not isinstance(key, str)
-                    or not isinstance(columns, list)
-                    or any(not isinstance(column, str) for column in columns)
-                    for key, columns in parsed_mapping.items()
+                        not isinstance(key, str)
+                        or not isinstance(columns, list)
+                        or any(not isinstance(column, str) for column in columns)
+                        for key, columns in parsed_mapping.items()
                 ):
                     raise ValueError("pool_columns must be a JSON object of pool IDs to column-name arrays")
                 mapping = parsed_mapping

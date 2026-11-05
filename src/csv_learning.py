@@ -6,12 +6,12 @@ import io
 import itertools
 import json
 import math
+import math
+import numpy as np
+import pandas as pd
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Mapping, Sequence
-
-import numpy as np
-import pandas as pd
 
 from src.domain import NumberPool, Ruleset, SourceFile
 from src.draw_schedule import (
@@ -22,6 +22,11 @@ from src.draw_schedule import (
 from src.information_theory import js_divergence
 from src.preprocessing import infer_number_columns
 from src.registry import SQLiteRegistry
+
+
+def _is_normalized(probability_sum: float, expected: int, rel_tol: float = 1e-10) -> bool:
+    """Check if probabilities are normalized to the expected sum."""
+    return math.isclose(probability_sum, expected, rel_tol=rel_tol)
 
 MINIMUM_DATASET_ROWS = 20
 MINIMUM_EVALUATION_ROWS = 1
@@ -764,7 +769,7 @@ def _train_and_evaluate(
         full_probabilities = (
             training_counts + SMOOTHING_STRENGTH * (pool.numbers_drawn / domain_size)
         ) / (row_count + SMOOTHING_STRENGTH)
-        if not math.isclose(float(full_probabilities.sum()), pool.numbers_drawn, rel_tol=1e-10):
+        if not _is_normalized(float(full_probabilities.sum()), pool.numbers_drawn):
             raise ArithmeticError(f"trained inclusion probabilities for pool {pool.pool_id!r} are not normalized")
 
         recent_start = max(first_test_index, row_count // 2)
